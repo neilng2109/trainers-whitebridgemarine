@@ -577,7 +577,7 @@
   }
 
   function simJoin() {
-    if (simIdx >= SIM_NAMES.length) return;
+    if (!SESSION_PIN || simIdx >= SIM_NAMES.length) return;
     const name = SIM_NAMES[simIdx++];
     const initials = name.split(' ').map(p => p[0]).join('');
     const list = document.getElementById('dash-participants');
@@ -601,6 +601,8 @@
     document.getElementById('dash-pin').textContent = '— — — —';
     document.getElementById('qr-container').innerHTML = '';
     document.getElementById('dash-participants').innerHTML = '<p style="font-size:13px;color:var(--text-faint);padding:12px 0;text-align:center;">Session ended.</p>';
+    markDone('dashboard');
+    nav('create');
   }
 
   function mn(el, nextId) {
@@ -618,8 +620,8 @@
     const pin = ['d1','d2','d3','d4'].map(id => document.getElementById(id).value).join('');
     const name = document.getElementById('pname').value.trim() || 'Participant';
     const err = document.getElementById('join-err');
-    const checkPin = SESSION_PIN || '4729'; // fallback for demo
-    if (pin === checkPin) {
+    if (!SESSION_PIN) { err.style.display = 'block'; return; }
+    if (pin === SESSION_PIN) {
       err.style.display = 'none';
       const initials = name.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0,2);
       document.getElementById('acc-avatar').textContent = initials || '?';
