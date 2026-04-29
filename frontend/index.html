@@ -302,8 +302,8 @@
           <span class="trainer-name">Power Quality &amp; Harmonics Trainer</span>
           <div class="check-box"></div>
         </div>
-        <div class="trainer-toggle" onclick="togTrainer(this)" data-name="ECR Tank Trainer">
-          <span class="trainer-name">ECR Tank Trainer</span>
+        <div class="trainer-toggle" onclick="togTrainer(this)" data-name="Auxiliary Boiler Trainer">
+          <span class="trainer-name">Auxiliary Boiler Trainer</span>
           <div class="check-box"></div>
         </div>
       </div>
@@ -415,11 +415,11 @@
   const API = 'https://trainers-backend-fffe8a616e00.herokuapp.com';
 
   const TRAINER_URLS = {
-    'VSI PWM Propulsion Drive Simulator': 'https://trainers.whitebridgemarine.com/VSI%20PWM%20Propulsion%20Drive%20Simulator.html',
-    'Cycloconverter PEM Propulsion Simulator': 'https://trainers.whitebridgemarine.com/cycloconverter_v8.8.html',
+    'VSI PWM Propulsion Drive Simulator': 'VSI_PWM_sim.html',
+    'Cycloconverter PEM Propulsion Simulator': 'cycloconverter_v8.8.html',
     'HV PTW Simulator': 'https://hvptw.whitebridgemarine.com',
-    'Power Quality & Harmonics Trainer': 'https://trainers.whitebridgemarine.com/harmonics.html',
-    'ECR Tank Trainer': 'https://trainers.whitebridgemarine.com/ecr_tank_trainer.html'
+    'Power Quality & Harmonics Trainer': 'harmonics_trainer.html',
+    'Auxiliary Boiler Trainer': 'boiler_sim_stage3.html'
   };
 
   let token = localStorage.getItem('wbm_token') || '';

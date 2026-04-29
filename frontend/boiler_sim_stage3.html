@@ -1,0 +1,3843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auxiliary Boiler Simulator - Stage 2 | Whitebridge Marine</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --bg: #0f1419;
+  --panel: #1a1f2e;
+  --border: #2d3748;
+  --text: #e2e8f0;
+  --muted: #718096;
+  --pv-color: #f6ad55;
+  --sp-color: #68d391;
+  --output-color: #63b3ed;
+  --alarm: #fc8181;
+  --alarm-bg: #742a2a;
+  --trip: #ff0040;
+  --ok: #38a169;
+  --warning: #d69e2e;
+  --flame: #f6ad55;
+  --water: #4299e1;
+  --steam: #a0aec0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;  /* Panels scroll independently */
+}
+header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+.header-logo {
+  height: 48px;
+  width: auto;
+}
+header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--sp-color);
+  letter-spacing: 0.5px;
+}
+header .subtitle {
+  color: var(--muted);
+  font-size: 13px;
+}
+.badge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.sound-btn {
+  margin-left: auto;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+  border: 1px solid #718096;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sound-btn:hover {
+  background: linear-gradient(135deg, #5a6578 0%, #3d4758 100%);
+}
+.sound-btn.active {
+  background: linear-gradient(135deg, #2f855a 0%, #276749 100%);
+  border-color: #48bb78;
+}
+.pause-btn {
+  margin-left: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+  border: 1px solid #718096;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pause-btn:hover {
+  background: linear-gradient(135deg, #5a6578 0%, #3d4758 100%);
+}
+.pause-btn.paused {
+  background: linear-gradient(135deg, #d69e2e 0%, #b7791f 100%);
+  border-color: #ecc94b;
+  animation: pulse 1s infinite;
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr 280px;
+  height: calc(100vh - 100px);  /* Fixed height below header */
+  margin-top: 70px;  /* Space for fixed header */
+}
+
+/* Left Panel - Controls */
+.left-panel {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: calc(100vh - 100px);  /* Independent scroll */
+  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;  /* IE/Edge */
+}
+.left-panel::-webkit-scrollbar {
+  display: none;  /* Chrome/Safari */
+}
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+.control-group {
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  padding: 12px;
+}
+/* Colour-coded control sections */
+.control-section .control-group {
+  border-left: 4px solid transparent;
+}
+.control-section.fuel .control-group { border-left-color: #ed8936; }      /* Orange - fuel */
+.control-section.burner .control-group { border-left-color: #f56565; }    /* Red - burner */
+.control-section.pressure .control-group { border-left-color: #9f7aea; }  /* Purple - pressure */
+.control-section.level .control-group { border-left-color: #4299e1; }     /* Blue - level/water */
+.control-section.combustion .control-group { border-left-color: #48bb78; } /* Green - O2/combustion */
+.control-section.demand .control-group { border-left-color: #ecc94b; }    /* Yellow - steam demand */
+.control-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.control-row:last-child { margin-bottom: 0; }
+.control-label {
+  font-size: 12px;
+  color: var(--text);
+}
+.control-value {
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Consolas', monospace;
+}
+.slider-container {
+  width: 100%;
+  margin-top: 6px;
+}
+.slider-container input[type="range"] {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  background: var(--border);
+  border-radius: 3px;
+  outline: none;
+}
+.slider-container input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--sp-color);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.toggle-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.toggle-btn.active {
+  background: var(--sp-color);
+  color: var(--bg);
+  border-color: var(--sp-color);
+}
+.toggle-btn:hover {
+  border-color: var(--sp-color);
+}
+.btn-group {
+  display: flex;
+  gap: 4px;
+}
+
+/* Burner Control */
+.burner-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+}
+.burner-btn.start {
+  background: var(--ok);
+  color: white;
+}
+.burner-btn.start:hover { background: #2f855a; }
+.burner-btn.start:disabled {
+  background: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.burner-btn.stop {
+  background: var(--alarm);
+  color: white;
+}
+.burner-btn.stop:hover { background: #c53030; }
+.burner-btn.stop:disabled {
+  background: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.burner-btn.reset {
+  background: var(--warning);
+  color: var(--bg);
+}
+.burner-btn.reset:hover { background: #b7791f; }
+
+.burner-status {
+  text-align: center;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-top: 8px;
+}
+.burner-status.off { background: var(--border); color: var(--muted); }
+.burner-status.purge { background: #2b6cb0; color: white; }
+.burner-status.pilot { background: #d69e2e; color: var(--bg); }
+.burner-status.low-fire { background: #dd6b20; color: white; }
+.burner-status.high-fire { background: #c53030; color: white; }
+.burner-status.trip { background: var(--trip); color: white; animation: flash 0.5s infinite; }
+
+@keyframes flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Center Panel - Schematic */
+.center-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  height: calc(100vh - 100px);  /* Fixed height */
+  overflow: hidden;
+  gap: 12px;
+}
+.schematic-row {
+  flex: 3;
+  display: flex;
+  gap: 12px;
+  min-height: 0;
+}
+.schematic-container {
+  flex: 1;
+  background: var(--panel);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  position: relative;
+  min-height: 0;  /* Allow flex shrinking */
+}
+.schematic-container canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Process Values Panel (beside mimic) */
+.process-values-panel {
+  width: 150px;
+  background: var(--panel);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+.pv-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.pv-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.pv-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.pv-item:last-child {
+  border-bottom: none;
+}
+.pv-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.pv-value {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'Consolas', 'JetBrains Mono', monospace;
+  min-width: 45px;
+  text-align: right;
+}
+.pv-value.pressure { color: var(--sp-color); }
+.pv-value.level { color: var(--water); }
+.pv-value.o2 { color: #68d391; }
+.pv-value.firing { color: var(--flame); }
+.pv-unit {
+  font-size: 10px;
+  color: var(--muted);
+  min-width: 24px;
+  text-align: left;
+  margin-left: 2px;
+}
+
+/* Trends */
+.trends-container {
+  flex: 1;  /* Takes 1/4 of space */
+  background: #000;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 8px;
+  min-height: 120px;
+}
+.trends-container canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Right Panel - Scenarios & Alarms (Instructor) */
+.right-panel {
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: calc(100vh - 100px);  /* Independent scroll */
+}
+
+/* Big Digital Readouts */
+.readout-panel {
+  background: #000;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+.readout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.readout-row:last-child { border-bottom: none; }
+.readout-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.readout-value {
+  font-family: 'Consolas', monospace;
+  font-size: 20px;
+  font-weight: 700;
+}
+.readout-value.pressure { color: var(--pv-color); }
+.readout-value.level { color: var(--water); }
+.readout-value.o2 { color: var(--sp-color); }
+.readout-value.firing { color: var(--flame); }
+.readout-unit {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+/* Alarm Panel */
+.alarm-panel {
+  background: #000;
+  border-radius: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+}
+.alarm-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+.alarm-tile {
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+}
+.alarm-tile.active {
+  background: var(--alarm);
+  color: white;
+  border-color: var(--alarm);
+  animation: alarmFlash 1s infinite;
+}
+.alarm-tile.trip {
+  background: var(--trip);
+  color: white;
+  border-color: var(--trip);
+  animation: alarmFlash 0.5s infinite;
+}
+@keyframes alarmFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Scenario System */
+.scenario-select {
+  width: 100%;
+  padding: 10px;
+  background: #1a202c;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.scenario-select:hover {
+  border-color: var(--sp-color);
+}
+.scenario-info {
+  background: rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+.scenario-title {
+  font-weight: 700;
+  color: var(--sp-color);
+  margin-bottom: 6px;
+}
+.scenario-desc {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+.scenario-objective {
+  font-size: 11px;
+  color: #68d391;
+  font-weight: 600;
+}
+.scenario-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.scenario-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.scenario-btn.start {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+}
+.scenario-btn.start:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+}
+.scenario-btn.stop {
+  background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+  color: white;
+}
+.scenario-btn.stop:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(229, 62, 62, 0.4);
+}
+.scenario-status {
+  font-size: 11px;
+  padding: 6px;
+  border-radius: 4px;
+  text-align: center;
+  min-height: 20px;
+}
+.scenario-status.running {
+  background: rgba(237, 137, 54, 0.2);
+  color: #ed8936;
+  animation: pulse 2s infinite;
+}
+.scenario-status.success {
+  background: rgba(72, 187, 120, 0.2);
+  color: #48bb78;
+}
+.scenario-status.failed {
+  background: rgba(229, 62, 62, 0.2);
+  color: #e53e3e;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Disturbance Buttons */
+.disturb-btn {
+  width: 100%;
+  padding: 8px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s;
+}
+.disturb-btn:hover {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.disturb-btn:active {
+  background: var(--warning);
+  color: var(--bg);
+}
+
+/* Plant Dynamics Buttons */
+.dynamics-btns {
+  display: flex;
+  gap: 4px;
+}
+.dynamics-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.dynamics-btn:hover {
+  border-color: var(--sp-color);
+  color: var(--sp-color);
+}
+.dynamics-btn.active {
+  background: linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%);
+  border-color: #4299e1;
+  color: white;
+}
+.dynamics-btn.active:nth-child(2) {
+  background: linear-gradient(135deg, #2f855a 0%, #38a169 100%);
+  border-color: #48bb78;
+}
+.dynamics-btn.active:nth-child(3) {
+  background: linear-gradient(135deg, #c05621 0%, #dd6b20 100%);
+  border-color: #ed8936;
+}
+
+/* Speed Control */
+.speed-control {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.speed-btn {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+}
+.speed-btn.active {
+  background: var(--sp-color);
+  color: var(--bg);
+  border-color: var(--sp-color);
+}
+
+/* Blowdown Controls (STAGE 2) */
+.bd-btn {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--water);
+  background: rgba(66, 153, 225, 0.1);
+  color: var(--water);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 8px 0;
+  transition: all 0.15s;
+  user-select: none;
+}
+.bd-btn:hover {
+  background: rgba(66, 153, 225, 0.2);
+}
+.bd-btn:active, .bd-btn.active {
+  background: var(--water);
+  color: var(--bg);
+}
+.bd-btn.warning {
+  border-color: var(--alarm);
+  background: rgba(252, 129, 129, 0.2);
+  color: var(--alarm);
+}
+.bd-btn.stuck {
+  border-color: var(--trip);
+  background: var(--trip);
+  color: white;
+  animation: flash 0.5s infinite;
+}
+.bd-progress-container {
+  position: relative;
+  height: 20px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.bd-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--water) 0%, var(--warning) 70%, var(--alarm) 100%);
+  transition: width 0.1s linear;
+}
+.bd-progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Soot Blow Controls (STAGE 3) */
+.soot-btn {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #a0aec0;
+  background: rgba(160, 174, 192, 0.1);
+  color: #a0aec0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 8px 0;
+  transition: all 0.15s;
+}
+.soot-btn:hover:not(:disabled) {
+  background: rgba(160, 174, 192, 0.2);
+}
+.soot-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.soot-btn.active {
+  background: #a0aec0;
+  color: var(--bg);
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.soot-btn.fault {
+  border-color: var(--alarm);
+  background: var(--alarm);
+  color: white;
+  animation: flash 0.5s infinite;
+}
+.soot-progress-container {
+  position: relative;
+  height: 20px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.soot-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #a0aec0 0%, #718096 100%);
+  transition: width 0.1s linear;
+}
+.soot-progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text);
+}
+.fouling-bar-container {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-top: 4px;
+}
+.fouling-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #68d391 0%, #d69e2e 50%, #fc8181 100%);
+  transition: width 0.5s;
+}
+.soot-sequence {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 9px;
+}
+.seq-step {
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+}
+.seq-step.active {
+  background: var(--sp-color);
+  border-color: var(--sp-color);
+  color: var(--bg);
+  font-weight: 700;
+}
+.seq-step.complete {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: white;
+}
+.seq-arrow {
+  color: var(--muted);
+}
+.interlock-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--muted);
+  padding: 4px 0;
+}
+.interlock-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--alarm);
+}
+.interlock-row.ok .interlock-indicator {
+  background: var(--ok);
+}
+
+/* Control Tabs (STAGE 2+) */
+.tab-container {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 8px;
+}
+.tab-btn {
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tab-btn:hover {
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+}
+.tab-btn.active {
+  color: var(--sp-color);
+  background: rgba(66, 153, 225, 0.15);
+  border-bottom: 2px solid var(--sp-color);
+  margin-bottom: -10px;
+}
+.tab-content {
+  display: none;
+}
+.tab-content.active {
+  display: block;
+}
+
+/* Footer */
+footer {
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  padding: 8px 20px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .main-grid {
+    grid-template-columns: 280px 1fr 240px;
+  }
+}
+@media (max-width: 900px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    min-height: auto;
+  }
+  .left-panel, .right-panel {
+    border: none;
+    border-bottom: 1px solid var(--border);
+    max-height: none;
+    overflow: visible;
+  }
+  .center-panel {
+    min-height: 500px;
+  }
+  .schematic-container {
+    min-height: 300px;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <img src="data:image/jpeg;base64,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" alt="Whitebridge Marine" class="header-logo">
+  <h1>🔥 Auxiliary Boiler Simulator</h1>
+  <span class="badge">Stage 3</span>
+  <span class="subtitle">Aalborg OC Style | Soot Blowing | Scenarios</span>
+  <button class="sound-btn" id="soundBtn" onclick="toggleSound()">🔇 Sound OFF</button>
+  <button class="pause-btn" id="pauseBtn" onclick="togglePause()">⏸ PAUSE</button>
+</header>
+
+<div class="main-grid">
+
+  <!-- LEFT PANEL - Controls -->
+  <div class="left-panel">
+    
+    <!-- Boiler Specifications -->
+    <div style="background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%); border-radius: 8px; padding: 10px; margin-bottom: 12px; font-size: 11px;">
+      <div style="color: #90cdf4; font-weight: 600; margin-bottom: 6px;">📋 BOILER DATA (Aalborg OC / SAACKE)</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; color: #e2e8f0;">
+        <span>Type:</span><span style="color:#fff;">Vertical Composite</span>
+        <span>Design P:</span><span style="color:#fff;">9.0 bar(g)</span>
+        <span>Working P:</span><span style="color:#fff;">7.0 bar(g)</span>
+        <span>Steam Cap:</span><span style="color:#fff;">0.75 - 5.0 t/h</span>
+        <span>FW Temp:</span><span style="color:#fff;">80°C</span>
+        <span>Control:</span><span style="color:#fff;">se@vis BMS</span>
+      </div>
+      <div style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 6px;">
+        <div style="color: #f6ad55; font-weight: 600; margin-bottom: 4px;">⚠ ALARM SETPOINTS</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; color: #e2e8f0; font-size: 10px;">
+          <span>L1 Low Level:</span><span style="color:#fc8181;">-80mm</span>
+          <span>L2 Low Trip:</span><span style="color:#ff0040;">-120mm</span>
+          <span>High Level:</span><span style="color:#fc8181;">+100mm</span>
+          <span>FW Stop:</span><span style="color:#ff0040;">+120mm</span>
+          <span>Low Press:</span><span style="color:#fc8181;">5.5 bar</span>
+          <span>High Press Trip:</span><span style="color:#ff0040;">9.0 bar</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Control Tabs -->
+    <div class="tab-container">
+      <button class="tab-btn active" onclick="switchTab('core')">⚙ Core</button>
+      <button class="tab-btn" onclick="switchTab('blowdown')">💧 Blowdown</button>
+      <button class="tab-btn" onclick="switchTab('sootblow')">💨 Soot Blow</button>
+    </div>
+    
+    <!-- TAB: Core Controls -->
+    <div id="tab-core" class="tab-content active">
+    
+    <!-- Fuel Selection -->
+    <div class="control-section fuel">
+      <div class="section-title">Fuel Mode</div>
+      <div class="control-group">
+        <div class="control-row">
+          <span class="control-label">Fuel Type</span>
+          <div class="btn-group">
+            <button class="toggle-btn active" id="fuelHFO" onclick="setFuelMode('HFO')">HFO</button>
+            <button class="toggle-btn" id="fuelMDO" onclick="setFuelMode('MDO')">MDO</button>
+          </div>
+        </div>
+        <div class="control-row" id="foTempRow">
+          <span class="control-label">FO Temp</span>
+          <span class="control-value" id="foTempDisplay" style="color:#f6ad55;">130°C</span>
+        </div>
+        <div class="slider-container" id="foTempSlider">
+          <input type="range" id="foTemp" min="80" max="160" step="5" value="130" oninput="updateFOTemp()">
+        </div>
+      </div>
+    </div>
+    
+    <!-- Burner Control -->
+    <div class="control-section burner">
+      <div class="section-title">Burner Control</div>
+      <div class="control-group">
+        <div class="btn-group">
+          <button class="burner-btn start" id="btnStart" onclick="startBurner()">▶ START</button>
+          <button class="burner-btn stop" id="btnStop" onclick="stopBurner()" disabled>■ STOP</button>
+        </div>
+        <button class="burner-btn reset" id="btnReset" onclick="resetTrip()" style="width:100%; margin-top:8px;">⟳ RESET / CLEAR FAULTS</button>
+        <div class="burner-status off" id="burnerStatus">STANDBY</div>
+      </div>
+    </div>
+
+    <!-- Steam Pressure Control -->
+    <div class="control-section pressure">
+      <div class="section-title">Steam Pressure Control</div>
+      <div class="control-group">
+        <div class="control-row">
+          <span class="control-label">Setpoint</span>
+          <span class="control-value" id="pressureSPDisplay">7.0 bar</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="pressureSP" min="5" max="10" step="0.1" value="7" oninput="updatePressureSP()">
+        </div>
+        <div class="control-row" style="margin-top:12px;">
+          <span class="control-label">Mode</span>
+          <div class="btn-group">
+            <button class="toggle-btn active" id="pressureAuto" onclick="setPressureMode('auto')">AUTO</button>
+            <button class="toggle-btn" id="pressureMan" onclick="setPressureMode('manual')">MANUAL</button>
+          </div>
+        </div>
+        <div class="control-row" id="manualFiringRow" style="display:none; margin-top:8px;">
+          <span class="control-label">Manual Firing</span>
+          <span class="control-value" id="manualFiringDisplay">50%</span>
+        </div>
+        <div class="slider-container" id="manualFiringSlider" style="display:none;">
+          <input type="range" id="manualFiring" min="0" max="100" step="1" value="50" oninput="updateManualFiring()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Drum Level Control -->
+    <div class="control-section level">
+      <div class="section-title">Drum Level Control</div>
+      <div class="control-group">
+        <div class="control-row">
+          <span class="control-label">Setpoint (NWL)</span>
+          <span class="control-value" id="levelSPDisplay">0 mm</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="levelSP" min="-50" max="50" step="5" value="0" oninput="updateLevelSP()">
+        </div>
+        <div class="control-row" style="margin-top:12px;">
+          <span class="control-label">Control Mode</span>
+          <div class="btn-group">
+            <button class="toggle-btn" id="levelManual" onclick="setLevelMode(0)">MANUAL</button>
+            <button class="toggle-btn" id="level1Elem" onclick="setLevelMode(1)">1-ELEM</button>
+            <button class="toggle-btn active" id="level3Elem" onclick="setLevelMode(3)">3-ELEM</button>
+          </div>
+        </div>
+        <div id="manualFWControl" style="display:none; margin-top:12px;">
+          <div class="control-row">
+            <span class="control-label">FW Valve (Manual)</span>
+            <span class="control-value" id="manualFWDisplay" style="color: var(--water);">50%</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="manualFW" min="0" max="100" step="1" value="50" oninput="updateManualFW()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Combustion Control -->
+    <div class="control-section combustion">
+      <div class="section-title">Combustion / O₂ Trim</div>
+      <div class="control-group">
+        <div class="control-row">
+          <span class="control-label">O₂ Setpoint</span>
+          <span class="control-value" id="o2SPDisplay">3.5%</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="o2SP" min="2" max="6" step="0.1" value="3.5" oninput="updateO2SP()">
+        </div>
+        <div class="control-row" style="margin-top:12px;">
+          <span class="control-label">O₂ Trim</span>
+          <div class="btn-group">
+            <button class="toggle-btn active" id="o2Auto" onclick="setO2Mode('auto')">AUTO</button>
+            <button class="toggle-btn" id="o2Man" onclick="setO2Mode('manual')">MANUAL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Steam Demand -->
+    <div class="control-section demand">
+      <div class="section-title">Steam Demand (Load)</div>
+      <div class="control-group">
+        <div class="control-row">
+          <span class="control-label">Demand</span>
+          <span class="control-value" id="steamDemandDisplay">50%</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="steamDemand" min="0" max="100" step="5" value="50" oninput="updateSteamDemand()">
+        </div>
+      </div>
+    </div>
+
+    </div><!-- END TAB: Core Controls -->
+
+    <!-- TAB: Blowdown Controls -->
+    <div id="tab-blowdown" class="tab-content">
+    
+    <!-- STAGE 2: Blowdown Controls -->
+    <div>
+      <div class="section-title">💧 Blowdown Control</div>
+      
+      <!-- Bottom Blowdown -->
+      <div class="control-group" style="margin-bottom: 12px;">
+        <div class="control-row">
+          <span class="control-label">Bottom Blowdown</span>
+          <span class="control-value" id="bottomBDStatus" style="color: var(--muted);">CLOSED</span>
+        </div>
+        <button class="bd-btn" id="btnBottomBD" 
+                onmousedown="startBottomBD()" 
+                onmouseup="stopBottomBD()" 
+                onmouseleave="stopBottomBD()"
+                ontouchstart="startBottomBD()"
+                ontouchend="stopBottomBD()">
+          ⬇ HOLD TO BLOW
+        </button>
+        <div class="bd-progress-container">
+          <div class="bd-progress-bar" id="bottomBDProgress"></div>
+          <span class="bd-progress-text" id="bottomBDTimer">0 / 10s</span>
+        </div>
+      </div>
+      
+      <!-- Surface Blowdown -->
+      <div class="control-group" style="margin-bottom: 12px;">
+        <div class="control-row">
+          <span class="control-label">Surface Blowdown</span>
+          <span class="control-value" id="surfaceBDDisplay">0%</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="surfaceBD" min="0" max="100" step="10" value="0" oninput="updateSurfaceBD()">
+        </div>
+      </div>
+      
+      <!-- Continuous Blowdown -->
+      <div class="control-group">
+        <div class="control-row">
+          <span class="control-label">Continuous BD</span>
+          <div class="btn-group">
+            <button class="toggle-btn active" id="contBDAuto" onclick="setContBDMode('auto')">AUTO</button>
+            <button class="toggle-btn" id="contBDMan" onclick="setContBDMode('manual')">MANUAL</button>
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Valve Position</span>
+          <span class="control-value" id="contBDValveDisplay" style="color: var(--water);">0%</span>
+        </div>
+        <div class="control-row" id="contBDManualRow" style="display: none;">
+          <span class="control-label">Manual SP</span>
+          <span class="control-value" id="contBDManualDisplay">20%</span>
+        </div>
+        <div class="slider-container" id="contBDManualSlider" style="display: none;">
+          <input type="range" id="contBDManual" min="0" max="100" step="5" value="20" oninput="updateContBDManual()">
+        </div>
+        <div class="control-row" style="margin-top: 8px;">
+          <span class="control-label">TDS Setpoint</span>
+          <span class="control-value" id="tdsSPDisplay">2500 ppm</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="tdsSP" min="1500" max="3500" step="100" value="2500" oninput="updateTdsSP()">
+        </div>
+      </div>
+    </div>
+
+    </div><!-- END TAB: Blowdown Controls -->
+
+    <!-- TAB: Soot Blow Controls -->
+    <div id="tab-sootblow" class="tab-content">
+    
+    <div>
+      <div class="section-title">💨 Soot Blower Control</div>
+      
+      <!-- Fouling Status -->
+      <div class="control-group" style="margin-bottom: 12px;">
+        <div class="control-row">
+          <span class="control-label">Tube Fouling</span>
+          <span class="control-value" id="foulingDisplay" style="color: #68d391;">0%</span>
+        </div>
+        <div class="fouling-bar-container">
+          <div class="fouling-bar" id="foulingBar"></div>
+        </div>
+        <div class="control-row" style="margin-top: 8px;">
+          <span class="control-label">Heat Transfer Eff.</span>
+          <span class="control-value" id="efficiencyDisplay" style="color: #68d391;">100%</span>
+        </div>
+      </div>
+      
+      <!-- Soot Blower Sequence -->
+      <div class="control-group">
+        <div class="control-row">
+          <span class="control-label">Blower Status</span>
+          <span class="control-value" id="sootBlowerStatus" style="color: var(--muted);">READY</span>
+        </div>
+        <button class="soot-btn" id="btnSootBlow" onclick="startSootBlow()">
+          💨 START SOOT BLOW
+        </button>
+        <div class="soot-progress-container">
+          <div class="soot-progress-bar" id="sootBlowProgress"></div>
+          <span class="soot-progress-text" id="sootBlowTimer">0 / 30s</span>
+        </div>
+        
+        <!-- Sequence Indicators -->
+        <div class="soot-sequence" style="margin-top: 12px;">
+          <div class="seq-step" id="seqReady">READY</div>
+          <div class="seq-arrow">→</div>
+          <div class="seq-step" id="seqInsert">INSERT</div>
+          <div class="seq-arrow">→</div>
+          <div class="seq-step" id="seqBlow">BLOW</div>
+          <div class="seq-arrow">→</div>
+          <div class="seq-step" id="seqRetract">RETRACT</div>
+        </div>
+      </div>
+      
+      <!-- Interlocks Display -->
+      <div class="control-group" style="margin-top: 12px;">
+        <div style="font-size: 10px; color: var(--muted); text-transform: uppercase; margin-bottom: 6px;">Interlocks</div>
+        <div class="interlock-row" id="interlockBurner">
+          <span class="interlock-indicator"></span>
+          <span>Burner Firing</span>
+        </div>
+        <div class="interlock-row" id="interlockPressure">
+          <span class="interlock-indicator"></span>
+          <span>Steam Pressure > 5 bar</span>
+        </div>
+        <div class="interlock-row" id="interlockSequence">
+          <span class="interlock-indicator"></span>
+          <span>No Sequence Active</span>
+        </div>
+      </div>
+    </div>
+
+    </div><!-- END TAB: Soot Blow Controls -->
+
+    <!-- Simulation Speed (always visible) -->
+    <div>
+      <div class="section-title">Simulation Speed</div>
+      <div class="speed-control">
+        <button class="speed-btn active" onclick="setSpeed(1)">1×</button>
+        <button class="speed-btn" onclick="setSpeed(2)">2×</button>
+        <button class="speed-btn" onclick="setSpeed(4)">4×</button>
+        <button class="speed-btn" onclick="setSpeed(10)">10×</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER PANEL - Schematic + Process Values -->
+  <div class="center-panel">
+    <div class="schematic-row">
+      <div class="schematic-container">
+        <canvas id="schematicCanvas"></canvas>
+      </div>
+      <div class="process-values-panel">
+        <div class="pv-title">Process Values</div>
+        <div class="pv-grid">
+          <div class="pv-item">
+            <span class="pv-label">Pressure</span>
+            <span class="pv-value pressure" id="pvPressure">0.0</span>
+            <span class="pv-unit">bar</span>
+          </div>
+          <div class="pv-item">
+            <span class="pv-label">Level</span>
+            <span class="pv-value level" id="pvLevel">0</span>
+            <span class="pv-unit">mm</span>
+          </div>
+          <div class="pv-item">
+            <span class="pv-label">Flue O₂</span>
+            <span class="pv-value o2" id="pvO2">21.0</span>
+            <span class="pv-unit">%</span>
+          </div>
+          <div class="pv-item">
+            <span class="pv-label">Firing</span>
+            <span class="pv-value firing" id="pvFiring">0</span>
+            <span class="pv-unit">%</span>
+          </div>
+          <div class="pv-item">
+            <span class="pv-label">FW Valve</span>
+            <span class="pv-value" id="pvFWValve" style="color:var(--water);">0</span>
+            <span class="pv-unit">%</span>
+          </div>
+          <div class="pv-item">
+            <span class="pv-label">FW Flow</span>
+            <span class="pv-value" id="pvFWFlow" style="color:var(--water);">0.0</span>
+            <span class="pv-unit">t/h</span>
+          </div>
+          <div class="pv-item">
+            <span class="pv-label">Steam Flow</span>
+            <span class="pv-value" id="pvSteamFlow" style="color:var(--steam);">0.0</span>
+            <span class="pv-unit">t/h</span>
+          </div>
+          <div class="pv-item" id="pvFOTempRow">
+            <span class="pv-label">FO Temp</span>
+            <span class="pv-value" id="pvFOTemp" style="color:var(--flame);">130</span>
+            <span class="pv-unit">°C</span>
+          </div>
+          <div class="pv-item">
+            <span class="pv-label">TDS</span>
+            <span class="pv-value" id="pvTDS" style="color:var(--water);">1500</span>
+            <span class="pv-unit">ppm</span>
+          </div>
+          <div class="pv-item">
+            <span class="pv-label">Soot</span>
+            <span class="pv-value" id="pvSoot" style="color:#ed8936;">0</span>
+            <span class="pv-unit">%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="trends-container">
+      <canvas id="trendChart"></canvas>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL - Scenarios & Alarms (Instructor) -->
+  <div class="right-panel">
+
+    <!-- Plant Dynamics -->
+    <div>
+      <div class="section-title">🌊 Plant Dynamics</div>
+      <div class="control-group">
+        <div class="dynamics-btns">
+          <button class="dynamics-btn active" id="dynBtnOff" onclick="setDynamics('off')">OFF</button>
+          <button class="dynamics-btn" id="dynBtnGentle" onclick="setDynamics('gentle')">GENTLE</button>
+          <button class="dynamics-btn" id="dynBtnActive" onclick="setDynamics('active')">ACTIVE</button>
+        </div>
+        <div style="font-size:10px; color:var(--muted); margin-top:6px; line-height:1.4;">
+          <b>OFF:</b> Stable demand<br>
+          <b>GENTLE:</b> Slow drift ±10%<br>
+          <b>ACTIVE:</b> Swings ±25%, steps
+        </div>
+      </div>
+    </div>
+
+    <!-- Training Scenarios -->
+    <div>
+      <div class="section-title">📋 Training Scenarios</div>
+      <div class="control-group">
+        <select id="scenarioSelect" class="scenario-select" onchange="selectScenario()">
+          <option value="">-- Select Scenario --</option>
+          <option value="levelTxFailure">1. Level Tx Failure</option>
+          <option value="fwCrisis">2. Feedwater Crisis</option>
+          <option value="blowdownMishap">3. Blowdown Mishap</option>
+          <option value="sensorDrift">4. Sensor Drift (Subtle)</option>
+          <option value="manualTakeover">5. Manual Takeover</option>
+          <option value="degradedMode">6. Degraded Mode</option>
+          <option value="cascadeFailure">7. Cascade Failure</option>
+        </select>
+        <div id="scenarioInfo" class="scenario-info" style="display:none;">
+          <div class="scenario-title" id="scenarioTitle"></div>
+          <div class="scenario-desc" id="scenarioDesc"></div>
+          <div class="scenario-objective" id="scenarioObjective"></div>
+        </div>
+        <div class="scenario-buttons" id="scenarioButtons" style="display:none;">
+          <button class="scenario-btn start" onclick="startScenario()">▶ START</button>
+          <button class="scenario-btn stop" onclick="stopScenario()">⬛ STOP</button>
+        </div>
+        <div id="scenarioStatus" class="scenario-status"></div>
+      </div>
+    </div>
+
+    <!-- Alarm Panel -->
+    <div>
+      <div class="section-title">Alarm Panel</div>
+      <div class="alarm-panel">
+        <div class="alarm-grid">
+          <div class="alarm-tile" id="alarmLowLevel1">LOW LEVEL 1st</div>
+          <div class="alarm-tile" id="alarmLowLevel2">LOW LEVEL TRIP</div>
+          <div class="alarm-tile" id="alarmHighLevel">HIGH LEVEL</div>
+          <div class="alarm-tile" id="alarmHighLevel2">HI LEVEL FW STOP</div>
+          <div class="alarm-tile" id="alarmLowPressure">LOW PRESSURE</div>
+          <div class="alarm-tile" id="alarmHighPressure">HIGH PRESS TRIP</div>
+          <div class="alarm-tile" id="alarmFlameFailure">FLAME FAILURE</div>
+          <div class="alarm-tile" id="alarmFanFail">FAN FAILURE</div>
+          <div class="alarm-tile" id="alarmFOLowPress">FO LOW PRESS</div>
+          <div class="alarm-tile" id="alarmFOHighTemp">FO HIGH TEMP</div>
+          <div class="alarm-tile" id="alarmFOLowTemp">FO LOW TEMP</div>
+          <div class="alarm-tile" id="alarmHighOpacity">HIGH OPACITY</div>
+          <div class="alarm-tile" id="alarmSteamHammer">STEAM HAMMER</div>
+          <div class="alarm-tile" id="alarmBDTimeout">BD TIMEOUT</div>
+          <div class="alarm-tile" id="alarmBDStuck">BD VALVE STUCK</div>
+          <div class="alarm-tile" id="alarmHighTDS">HIGH TDS</div>
+          <div class="alarm-tile" id="alarmHighSoot">HIGH SOOT</div>
+          <div class="alarm-tile" id="alarmSootFire">SOOT FIRE</div>
+          <div class="alarm-tile" id="alarmSootBlowerFault">BLOWER FAULT</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disturbances -->
+    <div>
+      <div class="section-title">Inject Disturbance</div>
+      <div class="control-group">
+        <button class="disturb-btn" onclick="injectDisturbance('steamStep')">⚡ Steam Demand +20%</button>
+        <button class="disturb-btn" onclick="injectDisturbance('fwPumpTrip')">⚠ FW Supply Fail (5s)</button>
+        <button class="disturb-btn" onclick="injectDisturbance('flameFail')">🔥 Flame Failure</button>
+        <button class="disturb-btn" onclick="injectDisturbance('foLowPress')">⛽ FO Low Pressure</button>
+        <button class="disturb-btn" onclick="injectDisturbance('foHeaterFail')">🌡 FO Heater Fail</button>
+        <button class="disturb-btn" onclick="injectDisturbance('bdStuck')">💧 BD Valve Stuck Open</button>
+        <button class="disturb-btn" onclick="injectDisturbance('highTDS')">🧪 Contaminated FW</button>
+        <button class="disturb-btn" onclick="injectDisturbance('sootBuildUp')">💨 Rapid Soot Buildup</button>
+        <button class="disturb-btn" onclick="injectDisturbance('sootBlowerStuck')">⚙ Soot Blower Stuck</button>
+        <button class="disturb-btn" onclick="injectDisturbance('steamHammer')">🔨 Steam Hammer (Test)</button>
+      </div>
+      <div class="section-title" style="margin-top: 12px;">Sensor Failures</div>
+      <div class="control-group">
+        <button class="disturb-btn" onclick="injectDisturbance('levelTxFailLow')">📉 Level Tx Fail LOW</button>
+        <button class="disturb-btn" onclick="injectDisturbance('levelTxFailHigh')">📈 Level Tx Fail HIGH</button>
+        <button class="disturb-btn" onclick="injectDisturbance('levelTxFrozen')">❄ Level Tx Frozen</button>
+        <button class="disturb-btn" onclick="injectDisturbance('steamFlowTxFail')">📉 Steam Flow Tx Fail</button>
+        <button class="disturb-btn" onclick="injectDisturbance('clearSensorFaults')">✓ Clear Sensor Faults</button>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<footer>
+  © 2026 Whitebridge Marine Kft | CSMART Training Resource | Stage 3: Soot Blowing + Scenarios
+</footer>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// AUXILIARY BOILER SIMULATOR - STAGE 3
+// Stage 2 + Soot Blowing System
+// ══════════════════════════════════════════════════════════════
+
+// === SIMULATION STATE ===
+const state = {
+  // Process variables
+  pressure: 1.0,        // bar (starts at atmospheric)
+  level: 0,             // mm from NWL
+  o2: 21.0,             // % (ambient)
+  firingRate: 0,        // %
+  fwValve: 50,          // %
+  steamFlow: 0,         // t/h
+  fwFlow: 0,            // t/h
+  tds: 1500,            // ppm (Total Dissolved Solids)
+  
+  // Setpoints
+  pressureSP: 7.0,
+  levelSP: 0,
+  o2SP: 3.5,
+  steamDemand: 50,      // % of max
+  tdsSP: 2500,          // ppm - continuous blowdown setpoint
+  
+  // Control modes
+  pressureMode: 'auto',
+  levelMode: 3,         // 0=manual, 1=single element, 3=three element
+  o2Mode: 'auto',
+  manualFiring: 50,
+  manualFW: 50,         // Manual FW valve position when in manual mode
+  
+  // Sensor failures (for training scenarios)
+  sensorFaults: {
+    levelTx: 'normal',      // normal, failHigh, failLow, frozen
+    pressureTx: 'normal',   // normal, failHigh, failLow, frozen
+    steamFlowTx: 'normal',  // normal, failHigh, failLow, frozen
+    frozenValues: {         // Captured values when sensor freezes
+      level: 0,
+      pressure: 7.0,
+      steamFlow: 0
+    }
+  },
+  
+  // Burner state (SAACKE se@vis style sequence)
+  burnerState: 'off',   // off, purge, pilot, pilot-prove, low-fire, high-fire, post-purge, trip
+  burnerTimer: 0,
+  flameOn: false,
+  
+  // Blowdown state (STAGE 2)
+  bottomBD: {
+    open: false,        // Valve open (hold-to-operate)
+    timer: 0,           // Seconds valve has been open
+    maxTime: 10,        // Max allowed open time
+    stuck: false        // Fault: valve stuck open
+  },
+  surfaceBD: {
+    open: false,        // Manual valve position
+    position: 0         // 0-100%
+  },
+  continuousBD: {
+    mode: 'auto',       // auto or manual
+    valve: 0,           // 0-100% valve position
+    manualSP: 20        // Manual setpoint
+  },
+  
+  // Alarms & trips
+  tripped: false,
+  tripReason: '',
+  resetLockout: 0,      // Seconds after reset before re-trip allowed
+  alarms: {
+    lowLevel1: false,
+    lowLevel2: false,
+    highLevel: false,
+    highLevel2: false,    // FW pump stop
+    lowPressure: false,
+    highPressure: false,
+    flameFailure: false,
+    fanFail: false,
+    foLowPress: false,
+    foHighTemp: false,    // HFO operation
+    foLowTemp: false,     // HFO operation
+    highOpacity: false,   // Smoke / low O2 combustion
+    steamHammer: false,   // Water hammer in steam lines
+    bdTimeout: false,     // Bottom blowdown held too long
+    bdStuck: false,       // Bottom blowdown valve stuck
+    highTDS: false,       // TDS above limit
+    highSoot: false,      // Soot accumulation high (STAGE 3)
+    sootFire: false,      // Soot fire in progress (STAGE 3)
+    sootBlowerFault: false // Soot blower mechanical fault (STAGE 3)
+  },
+  
+  // Steam hammer tracking
+  lastSteamDemand: 50,    // For rate of change detection
+  steamHammerTimer: 0,    // Cooldown timer
+  
+  // Soot blowing state (STAGE 3)
+  soot: {
+    level: 0,             // 0-100% accumulation
+    blowerState: 'ready', // ready, extending, blowing, retracting, fault
+    blowerTimer: 0,       // Sequence timer
+    autoMode: false,      // Auto soot blow enabled
+    autoTimer: 0,         // Time since last auto blow
+    fireActive: false     // Soot fire in progress
+  },
+  
+  // Fuel system state (for HFO/MDO operation)
+  fuelOilTemp: 130,       // °C (HFO heating)
+  fuelMode: 'HFO',        // HFO or MDO
+  
+  // Disturbances
+  fwPumpTripped: false,
+  fwPumpTripTimer: 0,
+  
+  // Simulation
+  speed: 1,
+  time: 0,
+  paused: false,
+  
+  // Plant dynamics
+  dynamics: 'off',           // off, gentle, active
+  dynamicsTimer: 0,          // Time since last event
+  dynamicsDemandTarget: 30,  // Target demand for drift
+  dynamicsO2Bias: 0          // Air register drift
+};
+
+// === PROCESS PARAMETERS (Aalborg OC / SAACKE aligned) ===
+const params = {
+  // Boiler specifications (Aalborg OC style)
+  designPressure: 9.0,        // bar(g) - typical Aalborg OC design
+  operatingPressure: 7.0,     // bar(g) - normal working pressure
+  
+  // Pressure dynamics
+  pressureTau: 5,             // seconds to ~63% response (faster for classroom)
+  maxPressureRate: 0.8,       // bar/s at 100% firing (faster raise)
+  pressureDecayRate: 0.1,     // bar/s per 100% steam demand
+  
+  // Level dynamics
+  levelTau: 6,
+  shrinkSwellGain: 15,        // mm per 10% firing rate change
+  shrinkSwellTau: 3,
+  steamToLevelGain: -0.8,     // mm/s per t/h steam
+  fwToLevelGain: 1.0,         // mm/s per t/h fw
+  
+  // Combustion dynamics
+  o2Tau: 4,
+  baseO2AtStoich: 0,          // theoretical
+  excessAirO2Gain: 0.5,       // % O2 per % excess air
+  
+  // Flow scaling (Aalborg OC: 0.75-5 t/h oil-fired)
+  maxSteamFlow: 5.0,          // t/h at 100% demand
+  maxFWFlow: 6.0,             // t/h at 100% valve
+  feedWaterTemp: 80,          // °C - typical feed water temperature
+  
+  // Alarm limits (manufacturer-aligned setpoints)
+  lowLevel1: -80,             // mm from NWL - 1st alarm
+  lowLevel2: -120,            // mm from NWL - 2nd alarm / trip
+  highLevel: 100,             // mm from NWL - high level alarm
+  highLevel2: 120,            // mm from NWL - FW pump stop
+  lowPressure: 5.5,           // bar - low pressure alarm
+  highPressure: 9.0,          // bar - high pressure trip (design pressure)
+  
+  // Fuel oil temperature limits (HFO operation - SAACKE specs)
+  foLowTemp: 110,             // °C - low FO temp alarm (poor atomisation)
+  foHighTemp: 150,            // °C - high FO temp alarm (coking risk)
+  foTempSP: 130,              // °C - FO heater setpoint for HFO
+  o2LowAlarm: 2.0,            // % - low O2 alarm (high opacity / incomplete combustion)
+  
+  // Blowdown parameters (STAGE 2)
+  bottomBDRate: 25,           // mm/s level drop when bottom BD open
+  surfaceBDRate: 8,           // mm/s level drop at 100% surface BD
+  continuousBDRate: 3,        // mm/s level drop at 100% continuous BD
+  bdTimeoutLimit: 10,         // seconds - max bottom BD open time
+  tdsHighAlarm: 3500,         // ppm - high TDS alarm
+  tdsRiseRate: 5,             // ppm/s rise during steaming (concentrate effect)
+  tdsFeedwater: 50,           // ppm - incoming feedwater TDS
+  
+  // Soot blowing parameters (STAGE 3)
+  sootBuildupRate: 0.5,       // %/s at 100% firing with poor combustion (high O2)
+  sootBuildupBase: 0.1,       // %/s at 100% firing with good combustion
+  sootRemovalRate: 15,        // %/s during soot blow
+  sootHighAlarm: 60,          // % - high soot alarm
+  sootFireRisk: 80,           // % - risk of soot fire above this
+  sootFireChance: 0.01,       // probability/s of fire when above risk level and firing
+  sootEfficiencyLoss: 0.3,    // % efficiency loss per % soot (affects heat transfer)
+  sootBlowSteamRate: 0.5,     // t/h steam consumption during soot blow
+  sootBlowExtendTime: 3,      // seconds to extend lance
+  sootBlowActiveTime: 8,      // seconds of steam blowing
+  sootBlowRetractTime: 3,     // seconds to retract lance
+  sootBlowMinPressure: 5.0,   // bar - minimum pressure to soot blow
+  sootAutoInterval: 120,      // seconds between auto soot blows (accelerated for training)
+  
+  // Burner timing - SAACKE se@vis style (classroom accelerated)
+  purgeTime: 5,               // Pre-purge (real: 30-60s)
+  pilotTime: 2,               // Pilot prove time
+  postPurgeTime: 3,           // Post-purge fan run (real: 15-30s)
+  
+  // Controller gains
+  pressureKp: 15,
+  pressureKi: 0.8,
+  levelKp: 2.0,
+  levelKi: 0.3,
+  o2Kp: 10,
+  o2Ki: 0.5
+};
+
+// === CONTROLLER STATE ===
+const controllers = {
+  pressureIntegral: 0,
+  levelIntegral: 0,
+  o2Integral: 0,
+  shrinkSwellEffect: 0,
+  lastFiringRate: 0
+};
+
+// === SCENARIO SYSTEM ===
+const scenarios = {
+  levelTxFailure: {
+    title: "Level Transmitter Failure",
+    desc: "Boiler stable at 70% load. Level transmitter will fail LOW after 15 seconds. Controller will flood the drum.",
+    objective: "Recognise the fault, switch to MANUAL, stabilise level before trip.",
+    setup: { 
+      steamDemand: 70, 
+      levelMode: 3,
+      runBoiler: true
+    },
+    events: [
+      { time: 15, action: 'levelTxFailLow' }
+    ],
+    failConditions: ['lowLevel2', 'highLevel2'],
+    timeLimit: 90
+  },
+  
+  fwCrisis: {
+    title: "Feedwater Crisis",
+    desc: "High load operation with level slightly low. FW supply will fail for 8 seconds.",
+    objective: "Reduce steam demand, manage level, prevent low level trip.",
+    setup: { 
+      steamDemand: 85,
+      levelMode: 3,
+      startLevel: -30,
+      runBoiler: true
+    },
+    events: [
+      { time: 10, action: 'fwPumpTrip' }
+    ],
+    failConditions: ['lowLevel2'],
+    timeLimit: 60
+  },
+  
+  blowdownMishap: {
+    title: "Blowdown Mishap",
+    desc: "High TDS requires blowdown. Bottom BD valve will stick open during operation.",
+    objective: "Recognise stuck valve, manage rapid level drop, reset system.",
+    setup: { 
+      steamDemand: 50,
+      levelMode: 3,
+      startTDS: 3200,
+      runBoiler: true
+    },
+    events: [
+      { time: 12, action: 'bdStuck' }
+    ],
+    failConditions: ['lowLevel2'],
+    timeLimit: 60
+  },
+  
+  sensorDrift: {
+    title: "Sensor Drift (Subtle)",
+    desc: "Normal operation. Level transmitter will freeze at current value - no obvious alarm.",
+    objective: "Notice gradual level deviation from setpoint. Diagnose frozen sensor.",
+    setup: { 
+      steamDemand: 60,
+      levelMode: 3,
+      runBoiler: true
+    },
+    events: [
+      { time: 20, action: 'levelTxFrozen' },
+      { time: 25, action: 'steamStep' }  // Change demand to make drift obvious
+    ],
+    failConditions: ['lowLevel2', 'highLevel2'],
+    timeLimit: 120
+  },
+  
+  manualTakeover: {
+    title: "Manual Takeover",
+    desc: "You have 60 seconds to prove you can manually control the boiler.",
+    objective: "Maintain level ±30mm and pressure ±0.5 bar in MANUAL mode.",
+    setup: { 
+      steamDemand: 50,
+      levelMode: 0,  // Start in manual
+      pressureMode: 'manual',
+      runBoiler: true
+    },
+    events: [
+      { time: 20, action: 'steamStep' },
+      { time: 40, action: 'steamDown' }
+    ],
+    failConditions: ['lowLevel1', 'highLevel', 'lowPressure', 'highPressure'],
+    timeLimit: 60
+  },
+  
+  degradedMode: {
+    title: "Degraded Mode Operation",
+    desc: "Three-element control at high load. Steam flow transmitter will fail.",
+    objective: "Recognise degraded response, switch to single-element control.",
+    setup: { 
+      steamDemand: 80,
+      levelMode: 3,
+      runBoiler: true
+    },
+    events: [
+      { time: 15, action: 'steamFlowTxFail' },
+      { time: 20, action: 'steamStep' }  // Load change to expose the problem
+    ],
+    failConditions: ['lowLevel2', 'highLevel2'],
+    timeLimit: 90
+  },
+  
+  cascadeFailure: {
+    title: "Cascade Failure",
+    desc: "High soot accumulation, high load. Multiple faults will occur.",
+    objective: "Prioritise, manage multiple issues, prevent trip.",
+    setup: { 
+      steamDemand: 75,
+      levelMode: 3,
+      startSoot: 55,
+      runBoiler: true
+    },
+    events: [
+      { time: 10, action: 'sootBuildUp' },
+      { time: 18, action: 'flameFail' },
+      { time: 25, action: 'steamStep' }
+    ],
+    failConditions: ['lowLevel2', 'highPressure'],
+    timeLimit: 90
+  }
+};
+
+// Scenario state
+let activeScenario = null;
+let scenarioTimer = 0;
+let scenarioEventIndex = 0;
+let scenarioStartTime = 0;
+let scenarioRunning = false;
+
+// === TREND DATA ===
+const trendData = {
+  time: [],
+  pressure: [],
+  level: [],
+  o2: [],
+  maxPoints: 600  // ~10 minutes of history at 1 sample/sec
+};
+
+let trendChart = null;
+
+// === AUDIO SYSTEM ===
+let audioCtx = null;
+let audioEnabled = false;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  audioEnabled = true;
+  document.getElementById('soundBtn').textContent = '🔊 Sound ON';
+  document.getElementById('soundBtn').classList.add('active');
+}
+
+function toggleSound() {
+  if (!audioCtx) {
+    initAudio();
+  } else {
+    audioEnabled = !audioEnabled;
+    document.getElementById('soundBtn').textContent = audioEnabled ? '🔊 Sound ON' : '🔇 Sound OFF';
+    document.getElementById('soundBtn').classList.toggle('active', audioEnabled);
+  }
+}
+
+// Steam hammer - metallic bangs that persist
+let steamHammerInterval = null;
+
+function playSteamHammer() {
+  if (!audioCtx || !audioEnabled) return;
+  
+  // Initial burst - 3-5 rapid knocks
+  const initialKnocks = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < initialKnocks; i++) {
+    setTimeout(() => playMetallicBang(), i * (60 + Math.random() * 80));
+  }
+  
+  // Then keep banging irregularly while condition persists
+  if (steamHammerInterval) clearInterval(steamHammerInterval);
+  
+  steamHammerInterval = setInterval(() => {
+    // Check if still hammering
+    if (!state.alarms.steamHammer) {
+      clearInterval(steamHammerInterval);
+      steamHammerInterval = null;
+      return;
+    }
+    
+    // Random burst of 1-3 knocks
+    const knocks = 1 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < knocks; i++) {
+      setTimeout(() => playMetallicBang(), i * (50 + Math.random() * 100));
+    }
+  }, 400 + Math.random() * 600);  // Every 0.4-1 second
+}
+
+function stopSteamHammer() {
+  if (steamHammerInterval) {
+    clearInterval(steamHammerInterval);
+    steamHammerInterval = null;
+  }
+}
+
+function playMetallicBang() {
+  if (!audioCtx || !audioEnabled) return;
+  
+  const now = audioCtx.currentTime;
+  
+  // === THE DEEP RUMBLE ===
+  const impactLength = audioCtx.sampleRate * 0.6;
+  const impactBuffer = audioCtx.createBuffer(1, impactLength, audioCtx.sampleRate);
+  const impactData = impactBuffer.getChannelData(0);
+  
+  for (let i = 0; i < impactLength; i++) {
+    let env;
+    if (i < 20) {
+      env = i / 20;
+    } else {
+      env = Math.exp(-(i - 20) / (audioCtx.sampleRate * 0.08));
+    }
+    impactData[i] = (Math.random() * 2 - 1) * env;
+  }
+  
+  const impactSource = audioCtx.createBufferSource();
+  impactSource.buffer = impactBuffer;
+  
+  const lp1 = audioCtx.createBiquadFilter();
+  lp1.type = 'lowpass';
+  lp1.frequency.value = 250;
+  lp1.Q.value = 0.7;
+  
+  const lp2 = audioCtx.createBiquadFilter();
+  lp2.type = 'lowpass';
+  lp2.frequency.value = 300;
+  lp2.Q.value = 0.7;
+  
+  const bass = audioCtx.createBiquadFilter();
+  bass.type = 'lowshelf';
+  bass.frequency.value = 100;
+  bass.gain.value = 10;
+  
+  const rumbleGain = audioCtx.createGain();
+  rumbleGain.gain.value = 1.8;
+  
+  // === THE METALLIC CLICK ===
+  // Very short, harsh, broadband - like wrench hitting pipe
+  const clickLength = audioCtx.sampleRate * 0.008;  // 8ms only
+  const clickBuffer = audioCtx.createBuffer(1, clickLength, audioCtx.sampleRate);
+  const clickData = clickBuffer.getChannelData(0);
+  
+  for (let i = 0; i < clickLength; i++) {
+    // Instant attack, instant decay
+    const env = Math.exp(-i / (audioCtx.sampleRate * 0.001));
+    // Harsh clipped noise
+    let sample = (Math.random() * 2 - 1) * env;
+    clickData[i] = Math.sign(sample) * Math.min(1, Math.abs(sample) * 3);
+  }
+  
+  const clickSource = audioCtx.createBufferSource();
+  clickSource.buffer = clickBuffer;
+  
+  // High-pass - remove boom, keep only the harsh click
+  const clickHP = audioCtx.createBiquadFilter();
+  clickHP.type = 'highpass';
+  clickHP.frequency.value = 2000;
+  clickHP.Q.value = 0.5;
+  
+  const clickGain = audioCtx.createGain();
+  clickGain.gain.value = 0.4;
+  
+  // === MASTER ===
+  const master = audioCtx.createGain();
+  master.gain.value = 1.0;
+  
+  // Connect rumble path
+  impactSource.connect(lp1);
+  lp1.connect(lp2);
+  lp2.connect(bass);
+  bass.connect(rumbleGain);
+  rumbleGain.connect(master);
+  
+  // Connect click path
+  clickSource.connect(clickHP);
+  clickHP.connect(clickGain);
+  clickGain.connect(master);
+  
+  master.connect(audioCtx.destination);
+  
+  // Play both together
+  impactSource.start(now);
+  clickSource.start(now);
+}
+
+// Alarm beep
+function playAlarmBeep() {
+  if (!audioCtx || !audioEnabled) return;
+  
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  
+  osc.type = 'square';
+  osc.frequency.value = 880;
+  
+  gain.gain.setValueAtTime(0.1, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+  
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  
+  osc.start(now);
+  osc.stop(now + 0.15);
+}
+
+// Trip klaxon
+function playTripKlaxon() {
+  if (!audioCtx || !audioEnabled) return;
+  
+  const now = audioCtx.currentTime;
+  
+  // Play 3 blasts
+  for (let i = 0; i < 3; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(440, now + i * 0.3);
+    osc.frequency.linearRampToValueAtTime(220, now + i * 0.3 + 0.25);
+    
+    gain.gain.setValueAtTime(0.15, now + i * 0.3);
+    gain.gain.setValueAtTime(0.15, now + i * 0.3 + 0.2);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.3 + 0.25);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.start(now + i * 0.3);
+    osc.stop(now + i * 0.3 + 0.3);
+  }
+}
+
+// Burner ignition whoosh
+function playIgnition() {
+  if (!audioCtx || !audioEnabled) return;
+  
+  const now = audioCtx.currentTime;
+  
+  // Noise burst with rising filter
+  const bufferSize = audioCtx.sampleRate * 0.8;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize) * 0.5;
+  }
+  
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(200, now);
+  filter.frequency.exponentialRampToValueAtTime(2000, now + 0.3);
+  filter.frequency.exponentialRampToValueAtTime(400, now + 0.8);
+  
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.linearRampToValueAtTime(0.15, now + 0.3);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+  
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  
+  source.start(now);
+}
+
+// === INITIALIZATION ===
+function init() {
+  initTrendChart();
+  initSchematic();
+  requestAnimationFrame(mainLoop);
+}
+
+function initTrendChart() {
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Pressure (bar)',
+          data: [],
+          borderColor: '#f6ad55',
+          backgroundColor: 'rgba(246,173,85,0.1)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Level (mm)',
+          data: [],
+          borderColor: '#4299e1',
+          backgroundColor: 'rgba(66,153,225,0.1)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          yAxisID: 'y1'
+        },
+        {
+          label: 'O₂ (%)',
+          data: [],
+          borderColor: '#68d391',
+          backgroundColor: 'rgba(104,211,145,0.1)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          yAxisID: 'y2'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: '#a0aec0', font: { size: 10 }, boxWidth: 12, padding: 8 }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#718096', maxTicksLimit: 6 }
+        },
+        y: {
+          type: 'linear',
+          position: 'left',
+          min: 0,
+          max: 12,
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#f6ad55', font: { size: 10 } },
+          title: { display: true, text: 'bar', color: '#f6ad55' }
+        },
+        y1: {
+          type: 'linear',
+          position: 'right',
+          min: -150,
+          max: 150,
+          grid: { display: false },
+          ticks: { color: '#4299e1', font: { size: 10 } },
+          title: { display: true, text: 'mm', color: '#4299e1' }
+        },
+        y2: {
+          type: 'linear',
+          position: 'right',
+          min: 0,
+          max: 25,
+          grid: { display: false },
+          ticks: { color: '#68d391', font: { size: 10 }, stepSize: 5 },
+          title: { display: true, text: 'O₂%', color: '#68d391' }
+        }
+      }
+    }
+  });
+}
+
+// === SCHEMATIC DRAWING ===
+let schematicCtx;
+function initSchematic() {
+  const canvas = document.getElementById('schematicCanvas');
+  schematicCtx = canvas.getContext('2d');
+  resizeSchematic();
+  window.addEventListener('resize', resizeSchematic);
+}
+
+function resizeSchematic() {
+  const canvas = document.getElementById('schematicCanvas');
+  const container = canvas.parentElement;
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+}
+
+function drawSchematic() {
+  const ctx = schematicCtx;
+  const W = ctx.canvas.width;
+  const H = ctx.canvas.height;
+  
+  ctx.clearRect(0, 0, W, H);
+  
+  // Scale factors - taller coordinate space (700x520)
+  const scale = Math.min(W / 700, H / 520);
+  const offsetX = (W - 700 * scale) / 2;
+  const offsetY = (H - 520 * scale) / 2;
+  
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
+  
+  // Draw boiler shell
+  ctx.strokeStyle = '#4a5568';
+  ctx.lineWidth = 3;
+  ctx.fillStyle = '#1a202c';
+  
+  // Main drum (taller: was 180, now 260)
+  ctx.beginPath();
+  ctx.roundRect(200, 60, 300, 260, 20);
+  ctx.fill();
+  ctx.stroke();
+  
+  // Furnace area (moved down)
+  ctx.fillStyle = state.flameOn ? 'rgba(246,173,85,0.2)' : '#0f1419';
+  ctx.beginPath();
+  ctx.roundRect(220, 340, 260, 100, 10);
+  ctx.fill();
+  ctx.stroke();
+  
+  // Draw flame if burning
+  if (state.flameOn && state.firingRate > 0) {
+    drawFlame(ctx, 350, 390, state.firingRate);
+  }
+  
+  // Water level in drum (adjusted for taller drum)
+  const waterMid = 190;  // NWL position
+  const waterTop = waterMid - (state.level / 150) * 80;
+  ctx.fillStyle = 'rgba(66,153,225,0.5)';
+  ctx.beginPath();
+  ctx.rect(205, Math.max(65, waterTop), 290, Math.min(250, 315 - waterTop));
+  ctx.fill();
+  
+  // NWL line (adjusted)
+  ctx.strokeStyle = '#68d391';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.moveTo(200, waterMid);
+  ctx.lineTo(505, waterMid);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Steam outlet
+  ctx.strokeStyle = '#a0aec0';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(350, 60);
+  ctx.lineTo(350, 20);
+  ctx.lineTo(550, 20);
+  ctx.stroke();
+  
+  // Steam flow indicator
+  if (state.steamFlow > 0.1) {
+    drawSteamFlow(ctx, 450, 20, state.steamFlow);
+  }
+  
+  // Feedwater inlet
+  ctx.strokeStyle = '#4299e1';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(150, 170);
+  ctx.lineTo(200, 170);
+  ctx.stroke();
+  
+  // FW valve symbol
+  drawValve(ctx, 120, 170, state.fwValve);
+  
+  // FW valve position label (with background)
+  const fwLabel = state.fwValve.toFixed(0) + '%';
+  ctx.font = 'bold 12px monospace';
+  const labelWidth = ctx.measureText(fwLabel).width;
+  ctx.fillStyle = 'rgba(26, 32, 44, 0.85)';
+  ctx.fillRect(120 - labelWidth/2 - 3, 125, labelWidth + 6, 16);
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.fillText(fwLabel, 120, 137);
+  
+  // FW pipe
+  ctx.beginPath();
+  ctx.moveTo(50, 170);
+  ctx.lineTo(100, 170);
+  ctx.stroke();
+  
+  // Flue gas outlet
+  ctx.strokeStyle = '#718096';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(480, 390);
+  ctx.lineTo(550, 390);
+  ctx.lineTo(550, 280);
+  ctx.lineTo(620, 280);
+  ctx.stroke();
+  
+  // Exhaust smoke (if burner firing)
+  if (state.flameOn && state.firingRate > 0) {
+    drawExhaustSmoke(ctx, 650, 280, state.o2, state.firingRate);
+  }
+  
+  // Labels
+  ctx.fillStyle = '#a0aec0';
+  ctx.font = '12px Segoe UI';
+  ctx.textAlign = 'center';
+  ctx.fillText('DRUM', 350, 195);
+  ctx.fillText('FURNACE', 350, 395);
+  ctx.fillText('STEAM', 550, 12);
+  ctx.fillText('FW', 50, 160);
+  ctx.fillText('FLUE', 620, 270);
+  
+  // Burner status indicator
+  ctx.fillStyle = getBurnerColor();
+  ctx.beginPath();
+  ctx.arc(250, 390, 15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 10px Consolas';
+  ctx.fillText(state.burnerState === 'off' ? 'OFF' : state.burnerState.toUpperCase().substring(0, 3), 250, 394);
+  
+  // Pressure gauge
+  drawGauge(ctx, 580, 100, state.pressure, state.pressureSP, 0, 12, 'bar');
+  
+  // O2 display
+  ctx.fillStyle = '#1a202c';
+  ctx.fillRect(600, 320, 80, 40);
+  ctx.strokeStyle = '#4a5568';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(600, 320, 80, 40);
+  ctx.fillStyle = '#68d391';
+  ctx.font = 'bold 16px Consolas';
+  ctx.textAlign = 'center';
+  ctx.fillText(state.o2.toFixed(1) + '%', 640, 345);
+  ctx.fillStyle = '#718096';
+  ctx.font = '10px Segoe UI';
+  ctx.fillText('O₂', 640, 358);
+  
+  ctx.restore();
+}
+
+function drawFlame(ctx, x, y, intensity) {
+  const flicker = Math.random() * 0.2 + 0.9;
+  const height = 30 + (intensity / 100) * 40;
+  
+  ctx.save();
+  ctx.translate(x, y);
+  
+  // Outer flame
+  const gradient = ctx.createRadialGradient(0, 0, 0, 0, -height/2, height);
+  gradient.addColorStop(0, 'rgba(255,200,50,' + (0.9 * flicker) + ')');
+  gradient.addColorStop(0.5, 'rgba(255,100,20,' + (0.7 * flicker) + ')');
+  gradient.addColorStop(1, 'rgba(255,50,0,0)');
+  
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.moveTo(-40, 0);
+  ctx.quadraticCurveTo(-30, -height * 0.5, -10, -height * flicker);
+  ctx.quadraticCurveTo(0, -height * 1.1 * flicker, 10, -height * flicker);
+  ctx.quadraticCurveTo(30, -height * 0.5, 40, 0);
+  ctx.fill();
+  
+  // Inner flame
+  ctx.fillStyle = 'rgba(255,255,200,' + (0.5 * flicker) + ')';
+  ctx.beginPath();
+  ctx.moveTo(-20, 0);
+  ctx.quadraticCurveTo(-10, -height * 0.4, 0, -height * 0.6 * flicker);
+  ctx.quadraticCurveTo(10, -height * 0.4, 20, 0);
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+function drawSteamFlow(ctx, x, y, flow) {
+  const puffs = Math.floor(flow * 2) + 1;
+  ctx.fillStyle = 'rgba(160,174,192,0.3)';
+  for (let i = 0; i < puffs; i++) {
+    const px = x + i * 20 + Math.sin(state.time * 3 + i) * 5;
+    const py = y + Math.cos(state.time * 2 + i) * 3;
+    const r = 8 + Math.sin(state.time * 4 + i * 2) * 3;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawExhaustSmoke(ctx, x, y, o2, firingRate) {
+  // Determine smoke colour and opacity based on O2 (combustion quality)
+  // O2 < 2%: dark smoke (insufficient air, incomplete combustion)
+  // O2 2-5%: light grey (good combustion)
+  // O2 > 6%: very light (excess air, wasting energy)
+  
+  let smokeR, smokeG, smokeB, smokeOpacity, density;
+  
+  if (o2 < 2) {
+    // Insufficient air - dark smoke
+    smokeR = 40; smokeG = 40; smokeB = 45;
+    smokeOpacity = 0.7;
+    density = 1.5;
+  } else if (o2 < 3) {
+    // Slightly rich - medium grey
+    smokeR = 80; smokeG = 80; smokeB = 85;
+    smokeOpacity = 0.5;
+    density = 1.2;
+  } else if (o2 <= 5) {
+    // Good combustion - light haze
+    smokeR = 140; smokeG = 145; smokeB = 150;
+    smokeOpacity = 0.3;
+    density = 1.0;
+  } else if (o2 <= 7) {
+    // Excess air - very light
+    smokeR = 180; smokeG = 185; smokeB = 190;
+    smokeOpacity = 0.2;
+    density = 0.7;
+  } else {
+    // High excess air - almost clear
+    smokeR = 200; smokeG = 205; smokeB = 210;
+    smokeOpacity = 0.1;
+    density = 0.5;
+  }
+  
+  // Scale with firing rate
+  const intensityScale = firingRate / 100;
+  smokeOpacity *= intensityScale;
+  
+  // Draw animated smoke puffs rising
+  const numPuffs = Math.floor(3 * density) + 2;
+  
+  for (let i = 0; i < numPuffs; i++) {
+    const age = (state.time * 0.8 + i * 0.7) % 3; // 0-3 cycle
+    const rise = age * 25; // Rise upward
+    const drift = Math.sin(state.time * 1.5 + i * 2) * (8 + age * 3); // Drift sideways
+    const expand = 1 + age * 0.4; // Expand as it rises
+    const fadeOut = Math.max(0, 1 - age / 3); // Fade as it rises
+    
+    const px = x + drift + i * 8;
+    const py = y - rise - 10;
+    const pr = (10 + i * 3) * expand * intensityScale;
+    
+    ctx.fillStyle = `rgba(${smokeR},${smokeG},${smokeB},${smokeOpacity * fadeOut})`;
+    ctx.beginPath();
+    ctx.arc(px, py, pr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawValve(ctx, x, y, opening) {
+  ctx.save();
+  ctx.translate(x, y);
+  
+  // Valve body
+  ctx.strokeStyle = '#4a5568';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-15, -10);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(-15, 10);
+  ctx.moveTo(15, -10);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(15, 10);
+  ctx.stroke();
+  
+  // Fill based on opening
+  const fillHeight = (opening / 100) * 16;
+  ctx.fillStyle = 'rgba(66,153,225,0.5)';
+  ctx.fillRect(-10, 8 - fillHeight, 20, fillHeight);
+  
+  // Stem
+  ctx.strokeStyle = '#718096';
+  ctx.beginPath();
+  ctx.moveTo(0, -10);
+  ctx.lineTo(0, -25);
+  ctx.stroke();
+  
+  ctx.restore();
+}
+
+function drawGauge(ctx, x, y, value, setpoint, min, max, unit) {
+  ctx.save();
+  ctx.translate(x, y);
+  
+  // Gauge background
+  ctx.fillStyle = '#1a202c';
+  ctx.beginPath();
+  ctx.arc(0, 0, 40, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#4a5568';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  
+  // Scale arc
+  ctx.strokeStyle = '#2d3748';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.arc(0, 0, 30, Math.PI * 0.75, Math.PI * 2.25);
+  ctx.stroke();
+  
+  // Value arc
+  const valueAngle = Math.PI * 0.75 + ((value - min) / (max - min)) * Math.PI * 1.5;
+  ctx.strokeStyle = value > params.highPressure ? '#fc8181' : '#f6ad55';
+  ctx.beginPath();
+  ctx.arc(0, 0, 30, Math.PI * 0.75, Math.min(valueAngle, Math.PI * 2.25));
+  ctx.stroke();
+  
+  // Setpoint marker
+  const spAngle = Math.PI * 0.75 + ((setpoint - min) / (max - min)) * Math.PI * 1.5;
+  ctx.fillStyle = '#68d391';
+  ctx.beginPath();
+  ctx.arc(30 * Math.cos(spAngle), 30 * Math.sin(spAngle), 4, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Needle
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(25 * Math.cos(valueAngle), 25 * Math.sin(valueAngle));
+  ctx.stroke();
+  
+  // Center
+  ctx.fillStyle = '#4a5568';
+  ctx.beginPath();
+  ctx.arc(0, 0, 5, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Digital value
+  ctx.fillStyle = '#f6ad55';
+  ctx.font = 'bold 12px Consolas';
+  ctx.textAlign = 'center';
+  ctx.fillText(value.toFixed(1), 0, 15);
+  ctx.fillStyle = '#718096';
+  ctx.font = '9px Segoe UI';
+  ctx.fillText(unit, 0, 26);
+  
+  ctx.restore();
+}
+
+function getBurnerColor() {
+  switch (state.burnerState) {
+    case 'off': return '#4a5568';
+    case 'purge': return '#4299e1';
+    case 'pilot': return '#d69e2e';
+    case 'low-fire': return '#dd6b20';
+    case 'high-fire': return '#c53030';
+    case 'trip': return '#ff0040';
+    default: return '#4a5568';
+  }
+}
+
+// === MAIN SIMULATION LOOP ===
+let lastTime = 0;
+function mainLoop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.1) * state.speed;
+  lastTime = timestamp;
+  
+  if (dt > 0 && !state.paused) {
+    state.time += dt;
+    
+    updateDynamics(dt);
+    updateBurnerSequence(dt);
+    updateProcess(dt);
+    updateSootBlowSequence(dt);
+    updateControllers(dt);
+    checkAlarms();
+    updateScenario(dt);
+    updateTrends();
+    updateDisplay();
+    updateBlowdownDisplay();
+    updateSootBlowDisplay();
+    drawSchematic();
+  }
+  
+  requestAnimationFrame(mainLoop);
+}
+
+function togglePause() {
+  state.paused = !state.paused;
+  const btn = document.getElementById('pauseBtn');
+  if (state.paused) {
+    btn.textContent = '▶ RESUME';
+    btn.className = 'pause-btn paused';
+  } else {
+    btn.textContent = '⏸ PAUSE';
+    btn.className = 'pause-btn';
+  }
+}
+
+// === PLANT DYNAMICS ===
+function updateDynamics(dt) {
+  if (state.dynamics === 'off') return;
+  
+  state.dynamicsTimer += dt;
+  
+  const isGentle = state.dynamics === 'gentle';
+  const demandDriftSpeed = isGentle ? 8 : 15;       // %/sec drift rate
+  const demandStepChance = isGentle ? 0.01 : 0.025; // probability/sec of step change
+  const demandStepSize = isGentle ? 10 : 20;        // % step size
+  const o2DriftSpeed = isGentle ? 0.3 : 0.6;        // %/sec O2 drift
+  const o2DriftChance = isGentle ? 0.005 : 0.015;   // probability/sec of O2 shift
+  
+  // Sinusoidal demand drift (base oscillation)
+  const period = isGentle ? 45 : 30;  // seconds per cycle
+  const amplitude = isGentle ? 10 : 20;
+  const baseOscillation = Math.sin(state.time * 2 * Math.PI / period) * amplitude;
+  
+  // Random step changes to target
+  if (Math.random() < demandStepChance * dt) {
+    const step = (Math.random() - 0.5) * 2 * demandStepSize;
+    state.dynamicsDemandTarget = Math.max(10, Math.min(90, state.dynamicsDemandTarget + step));
+  }
+  
+  // Apply demand (oscillation + target drift)
+  const targetDemand = Math.max(5, Math.min(95, state.dynamicsDemandTarget + baseOscillation));
+  const demandDiff = targetDemand - state.steamDemand;
+  state.steamDemand += Math.sign(demandDiff) * Math.min(Math.abs(demandDiff), demandDriftSpeed * dt);
+  state.steamDemand = Math.max(0, Math.min(100, state.steamDemand));
+  
+  // O2 / air register drift (only in active mode or occasionally in gentle)
+  if (Math.random() < o2DriftChance * dt) {
+    state.dynamicsO2Bias += (Math.random() - 0.5) * 1.5;
+    state.dynamicsO2Bias = Math.max(-2, Math.min(2, state.dynamicsO2Bias));
+  }
+  
+  // Update demand slider display
+  document.getElementById('steamDemand').value = state.steamDemand;
+  document.getElementById('steamDemandDisplay').textContent = state.steamDemand.toFixed(0) + '%';
+}
+
+function setDynamics(mode) {
+  state.dynamics = mode;
+  state.dynamicsTimer = 0;
+  state.dynamicsO2Bias = 0;  // Reset O2 drift
+  
+  // Update button states
+  document.querySelectorAll('.dynamics-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  
+  const btnId = {
+    'off': 'dynBtnOff',
+    'gentle': 'dynBtnGentle', 
+    'active': 'dynBtnActive'
+  }[mode];
+  
+  if (btnId) {
+    document.getElementById(btnId).classList.add('active');
+  }
+  
+  // Reset demand target to current when switching modes
+  state.dynamicsDemandTarget = state.steamDemand;
+}
+
+// === BURNER SEQUENCING ===
+function updateBurnerSequence(dt) {
+  if (state.tripped) {
+    state.burnerState = 'trip';
+    state.flameOn = false;
+    state.firingRate = 0;
+    return;
+  }
+  
+  switch (state.burnerState) {
+    case 'purge':
+      // Pre-purge: FD fan runs, prove airflow, purge furnace
+      state.burnerTimer += dt;
+      if (state.burnerTimer >= params.purgeTime) {
+        state.burnerState = 'pilot';
+        state.burnerTimer = 0;
+      }
+      break;
+      
+    case 'pilot':
+      // Pilot ignition: spark + pilot fuel
+      state.burnerTimer += dt;
+      if (state.burnerTimer >= params.pilotTime) {
+        state.burnerState = 'pilot-prove';
+        state.burnerTimer = 0;
+      }
+      break;
+    
+    case 'pilot-prove':
+      // Pilot prove: flame scanner confirms pilot (SAACKE style)
+      state.burnerTimer += dt;
+      if (state.burnerTimer >= 1) { // 1 second prove time
+        state.flameOn = true;
+        state.burnerState = 'low-fire';
+        state.burnerTimer = 0;
+        playIgnition();  // Whoosh!
+      }
+      break;
+      
+    case 'low-fire':
+    case 'high-fire':
+      // Determine firing mode based on rate (modulating burner)
+      if (state.firingRate > 60) {
+        state.burnerState = 'high-fire';
+      } else {
+        state.burnerState = 'low-fire';
+      }
+      break;
+    
+    case 'post-purge':
+      // Post-purge: fan continues after shutdown
+      state.burnerTimer += dt;
+      if (state.burnerTimer >= params.postPurgeTime) {
+        state.burnerState = 'off';
+        state.burnerTimer = 0;
+      }
+      break;
+  }
+  
+  updateBurnerStatusDisplay();
+}
+
+function updateBurnerStatusDisplay() {
+  const el = document.getElementById('burnerStatus');
+  el.className = 'burner-status ' + state.burnerState.replace('-', '-');
+  
+  const labels = {
+    'off': 'STANDBY',
+    'purge': 'PRE-PURGE',
+    'pilot': 'PILOT IGN',
+    'pilot-prove': 'PILOT PROVE',
+    'low-fire': '🔥 LOW FIRE',
+    'high-fire': '🔥🔥 HIGH FIRE',
+    'post-purge': 'POST-PURGE',
+    'trip': '⚠ LOCKOUT'
+  };
+  el.textContent = labels[state.burnerState] || state.burnerState.toUpperCase();
+  
+  // Disable START if not in standby, or if tripped, or if critical alarm active
+  const canStart = state.burnerState === 'off' && !state.tripped && !state.alarms.lowLevel2;
+  document.getElementById('btnStart').disabled = !canStart;
+  document.getElementById('btnStop').disabled = state.burnerState === 'off' || state.tripped || state.burnerState === 'post-purge';
+}
+
+// === PROCESS MODEL ===
+function updateProcess(dt) {
+  // Handle FW pump trip
+  if (state.fwPumpTripped) {
+    state.fwPumpTripTimer -= dt;
+    if (state.fwPumpTripTimer <= 0) {
+      state.fwPumpTripped = false;
+    }
+  }
+  
+  // Steam flow based on demand and pressure
+  const pressureFactor = Math.max(0, (state.pressure - 1) / (state.pressureSP - 1));
+  state.steamFlow = (state.steamDemand / 100) * params.maxSteamFlow * Math.min(1, pressureFactor);
+  
+  // FW flow based on valve position (zero if pump tripped)
+  state.fwFlow = state.fwPumpTripped ? 0 : (state.fwValve / 100) * params.maxFWFlow;
+  
+  // === PRESSURE DYNAMICS ===
+  // Soot fouling reduces heat transfer efficiency (STAGE 3)
+  const efficiency = Math.max(0.3, 1 - state.soot.level * params.sootEfficiencyLoss / 100);
+  
+  let pressureTarget;
+  if (state.flameOn && state.firingRate > 0) {
+    // Firing adds pressure (reduced by fouling)
+    const heatInput = (state.firingRate / 100) * params.maxPressureRate * efficiency;
+    const heatLoss = (state.steamFlow / params.maxSteamFlow) * params.pressureDecayRate;
+    pressureTarget = state.pressure + (heatInput - heatLoss) * dt * 10;
+  } else {
+    // Cooling down
+    const heatLoss = (state.steamFlow / params.maxSteamFlow) * params.pressureDecayRate + 0.01;
+    pressureTarget = state.pressure - heatLoss * dt * 5;
+  }
+  pressureTarget = Math.max(1, Math.min(12, pressureTarget));
+  
+  // First-order lag
+  const pressureAlpha = 1 - Math.exp(-dt / params.pressureTau);
+  state.pressure += (pressureTarget - state.pressure) * pressureAlpha;
+  
+  // === LEVEL DYNAMICS ===
+  // Shrink/swell effect
+  const firingChange = state.firingRate - controllers.lastFiringRate;
+  controllers.shrinkSwellEffect += firingChange * params.shrinkSwellGain / 100;
+  controllers.shrinkSwellEffect *= Math.exp(-dt / params.shrinkSwellTau);
+  controllers.lastFiringRate = state.firingRate;
+  
+  // Blowdown effects on level (STAGE 2)
+  let blowdownLoss = 0;
+  
+  // Bottom blowdown - rapid level drop (this is a large bore valve)
+  if (state.bottomBD.open || state.bottomBD.stuck) {
+    blowdownLoss += params.bottomBDRate;  // mm/s direct drop
+    state.bottomBD.timer += dt;
+    
+    // Timeout alarm if held too long
+    if (state.bottomBD.timer >= params.bdTimeoutLimit) {
+      state.alarms.bdTimeout = true;
+    }
+  }
+  
+  // Surface blowdown
+  if (state.surfaceBD.position > 0) {
+    blowdownLoss += (state.surfaceBD.position / 100) * params.surfaceBDRate;
+  }
+  
+  // Continuous blowdown
+  if (state.continuousBD.valve > 0) {
+    blowdownLoss += (state.continuousBD.valve / 100) * params.continuousBDRate;
+  }
+  
+  // Mass balance including blowdown - blowdown is a DIRECT level drop
+  const levelChangeRate = (state.fwFlow - state.steamFlow) * 4;  // mm/s per t/h imbalance (reduced for stability)
+  
+  // Apply flow imbalance DIRECTLY (not through lag) for more responsive level changes
+  state.level += levelChangeRate * dt;
+  
+  // Shrink/swell effect applied separately (this can be lagged)
+  const levelAlpha = 1 - Math.exp(-dt / params.levelTau);
+  state.level += controllers.shrinkSwellEffect * levelAlpha;
+  
+  // Apply blowdown loss DIRECTLY to level
+  state.level -= blowdownLoss * dt;
+  
+  state.level = Math.max(-150, Math.min(150, state.level));
+  
+  // === TDS DYNAMICS (STAGE 2) ===
+  // TDS rises as water evaporates (concentration effect)
+  if (state.steamFlow > 0) {
+    // Concentration increases with steam production
+    const concentrationRate = (state.steamFlow / params.maxSteamFlow) * params.tdsRiseRate;
+    state.tds += concentrationRate * dt;
+  }
+  
+  // Feedwater dilutes TDS
+  if (state.fwFlow > 0) {
+    const dilutionRate = (state.fwFlow / params.maxFWFlow) * (state.tds - params.tdsFeedwater) * 0.01;
+    state.tds -= dilutionRate * dt;
+  }
+  
+  // Blowdown removes high-TDS water (lowers concentration)
+  const totalBDFlow = (state.bottomBD.open ? 1 : 0) + 
+                      (state.surfaceBD.position / 100) * 0.3 + 
+                      (state.continuousBD.valve / 100) * 0.2;
+  if (totalBDFlow > 0) {
+    state.tds -= totalBDFlow * params.tdsRiseRate * 2 * dt;
+  }
+  
+  // Clamp TDS
+  state.tds = Math.max(100, Math.min(5000, state.tds));
+  
+  // === COMBUSTION / O2 ===
+  let o2Target;
+  if (state.flameOn && state.firingRate > 5) {
+    // O2 drops when burning, excess air keeps it up
+    const baseO2 = 21 - (state.firingRate / 100) * 20;
+    // Apply air register drift from plant dynamics
+    o2Target = Math.max(0, baseO2 + state.o2SP + state.dynamicsO2Bias);
+  } else {
+    o2Target = 21; // Ambient
+  }
+  
+  const o2Alpha = 1 - Math.exp(-dt / params.o2Tau);
+  state.o2 += (o2Target - state.o2) * o2Alpha;
+  state.o2 = Math.max(0, Math.min(21, state.o2));
+  
+  // === SOOT DYNAMICS (STAGE 3) ===
+  // Soot builds up when firing - rate depends on combustion quality
+  if (state.flameOn && state.firingRate > 0) {
+    // Poor combustion (high O2 = excess air, or low O2 = incomplete) increases soot
+    const o2Deviation = Math.abs(state.o2 - state.o2SP);
+    const combustionQuality = Math.max(0, 1 - o2Deviation / 5);  // 1 = perfect, 0 = poor
+    
+    const sootRate = params.sootBuildupBase + 
+                     (1 - combustionQuality) * (params.sootBuildupRate - params.sootBuildupBase);
+    state.soot.level += sootRate * (state.firingRate / 100) * dt;
+  }
+  
+  // Soot blower sequence
+  if (state.soot.blowerState !== 'ready' && state.soot.blowerState !== 'fault') {
+    state.soot.blowerTimer += dt;
+    
+    const totalTime = params.sootBlowExtendTime + params.sootBlowActiveTime + params.sootBlowRetractTime;
+    
+    if (state.soot.blowerState === 'extending') {
+      if (state.soot.blowerTimer >= params.sootBlowExtendTime) {
+        state.soot.blowerState = 'blowing';
+        state.soot.blowerTimer = 0;
+      }
+    } else if (state.soot.blowerState === 'blowing') {
+      // Remove soot during blow
+      state.soot.level = Math.max(0, state.soot.level - params.sootRemovalRate * dt);
+      // Consume steam
+      state.steamFlow += params.sootBlowSteamRate;  // Additional steam consumption
+      
+      if (state.soot.blowerTimer >= params.sootBlowActiveTime) {
+        state.soot.blowerState = 'retracting';
+        state.soot.blowerTimer = 0;
+      }
+    } else if (state.soot.blowerState === 'retracting') {
+      if (state.soot.blowerTimer >= params.sootBlowRetractTime) {
+        state.soot.blowerState = 'ready';
+        state.soot.blowerTimer = 0;
+      }
+    }
+  }
+  
+  // Auto soot blow
+  if (state.soot.autoMode && state.soot.blowerState === 'ready') {
+    state.soot.autoTimer += dt;
+    if (state.soot.autoTimer >= params.sootAutoInterval) {
+      if (canSootBlow()) {
+        startSootBlow();
+      }
+      state.soot.autoTimer = 0;
+    }
+  }
+  
+  // Soot fire risk - random chance when above threshold and firing at operating pressure
+  // Soot fires don't happen during startup - need hot tubes and accumulated deposits
+  if (state.soot.level >= params.sootFireRisk && state.flameOn && !state.soot.fireActive && state.pressure >= 5.0) {
+    if (Math.random() < params.sootFireChance * dt) {
+      state.soot.fireActive = true;
+      state.alarms.sootFire = true;
+    }
+  }
+  
+  // Soot fire effects - increases soot (feeds on deposits)
+  // Response: STOP BURNER, do NOT soot blow (fans flames), let it burn out
+  if (state.soot.fireActive) {
+    state.soot.level = Math.min(100, state.soot.level + 3 * dt);  // Fire spreads slowly
+    
+    // Fire self-extinguishes when burner stopped (starve oxygen/heat)
+    if (!state.flameOn) {
+      // Fire burns down over time when burner off
+      state.soot.level = Math.max(0, state.soot.level - 2 * dt);
+      if (state.soot.level < 30) {
+        state.soot.fireActive = false;
+        state.alarms.sootFire = false;  // Fire out
+      }
+    }
+  }
+  
+  // Clamp soot level
+  state.soot.level = Math.max(0, Math.min(100, state.soot.level));
+  
+  // Efficiency loss affects pressure response (applied in pressure calc above via heatInput modifier)
+  // This is handled by reducing effective firing rate based on soot level
+}
+
+// === SENSOR READINGS (may be faulty) ===
+function getSensorReading(sensor) {
+  const fault = state.sensorFaults[sensor + 'Tx'];
+  
+  switch (sensor) {
+    case 'level':
+      if (fault === 'failHigh') return 150;      // Tx fails high - shows max level
+      if (fault === 'failLow') return -150;      // Tx fails low - shows min level
+      if (fault === 'frozen') return state.sensorFaults.frozenValues.level;
+      return state.level;  // Normal
+      
+    case 'pressure':
+      if (fault === 'failHigh') return 12;       // Tx fails high
+      if (fault === 'failLow') return 0;         // Tx fails low
+      if (fault === 'frozen') return state.sensorFaults.frozenValues.pressure;
+      return state.pressure;  // Normal
+      
+    case 'steamFlow':
+      if (fault === 'failHigh') return params.maxSteamFlow;  // Tx fails high
+      if (fault === 'failLow') return 0;         // Tx fails low
+      if (fault === 'frozen') return state.sensorFaults.frozenValues.steamFlow;
+      return state.steamFlow;  // Normal
+      
+    default:
+      return 0;
+  }
+}
+
+// Capture current values when freezing a sensor
+function freezeSensor(sensor) {
+  state.sensorFaults.frozenValues.level = state.level;
+  state.sensorFaults.frozenValues.pressure = state.pressure;
+  state.sensorFaults.frozenValues.steamFlow = state.steamFlow;
+}
+
+// === CONTROLLERS ===
+function updateControllers(dt) {
+  // Firing stops when tripped or off, but FW control continues
+  if (state.tripped || state.burnerState === 'off') {
+    state.firingRate = 0;
+    // Don't return - let level controller run below
+  } else {
+    // === PRESSURE CONTROLLER ===
+    // Get sensor reading (may be faulty)
+    const pressureReading = getSensorReading('pressure');
+    
+    if (state.pressureMode === 'auto') {
+      const pressureError = state.pressureSP - pressureReading;
+      controllers.pressureIntegral += pressureError * dt;
+      controllers.pressureIntegral = Math.max(-50, Math.min(50, controllers.pressureIntegral));
+      
+      let firingDemand = params.pressureKp * pressureError + params.pressureKi * controllers.pressureIntegral;
+      firingDemand = Math.max(10, Math.min(100, firingDemand + 50)); // Bias
+      
+      // Rate limit
+      const maxRate = 20 * dt;
+      state.firingRate += Math.max(-maxRate, Math.min(maxRate, firingDemand - state.firingRate));
+    } else {
+      state.firingRate = state.manualFiring;
+    }
+  }
+  
+  // === LEVEL CONTROLLER (always runs - FW needed even when tripped) ===
+  // Get sensor readings (may be faulty)
+  const levelReading = getSensorReading('level');
+  const steamFlowReading = getSensorReading('steamFlow');
+  
+  const levelError = state.levelSP - levelReading;
+  
+  if (state.levelMode === 0) {
+    // Manual mode - operator controls FW valve directly
+    state.fwValve = state.manualFW;
+  } else if (state.levelMode === 3) {
+    // Three-element: level + steam flow + FW flow
+    controllers.levelIntegral += levelError * dt;
+    controllers.levelIntegral = Math.max(-100, Math.min(100, controllers.levelIntegral));
+    
+    let fwDemand = params.levelKp * levelError + params.levelKi * controllers.levelIntegral;
+    // Feedforward from steam flow (lagged slightly for realism)
+    fwDemand += (steamFlowReading / params.maxSteamFlow) * 40;
+    fwDemand = Math.max(0, Math.min(100, fwDemand + 50));
+    
+    // Valve moves towards demand (rate limited to ~30%/sec)
+    state.fwValve += Math.max(-30 * dt, Math.min(30 * dt, fwDemand - state.fwValve));
+  } else {
+    // Single element: level only
+    controllers.levelIntegral += levelError * dt * 0.5;
+    controllers.levelIntegral = Math.max(-100, Math.min(100, controllers.levelIntegral));
+    
+    let fwDemand = params.levelKp * 0.5 * levelError + params.levelKi * 0.3 * controllers.levelIntegral + 50;
+    fwDemand = Math.max(0, Math.min(100, fwDemand));
+    
+    // Single element slower response (~20%/sec)
+    state.fwValve += Math.max(-20 * dt, Math.min(20 * dt, fwDemand - state.fwValve));
+  }
+  
+  // === CONTINUOUS BLOWDOWN CONTROLLER (STAGE 2) ===
+  if (state.continuousBD.mode === 'auto') {
+    // Simple proportional control on TDS
+    const tdsError = state.tds - state.tdsSP;
+    let bdDemand = 0;
+    
+    if (tdsError > 0) {
+      // TDS above setpoint - open BD valve proportionally
+      bdDemand = Math.min(100, tdsError * 0.1);  // 10% valve per 100ppm over SP
+    }
+    
+    // Rate limit valve movement
+    state.continuousBD.valve += Math.max(-5 * dt, Math.min(5 * dt, bdDemand - state.continuousBD.valve));
+  } else {
+    // Manual mode - move to manual setpoint
+    state.continuousBD.valve += Math.max(-10 * dt, Math.min(10 * dt, state.continuousBD.manualSP - state.continuousBD.valve));
+  }
+  
+  state.continuousBD.valve = Math.max(0, Math.min(100, state.continuousBD.valve));
+}
+
+// === ALARMS & TRIPS ===
+function checkAlarms() {
+  // Level alarms
+  state.alarms.lowLevel1 = state.level <= params.lowLevel1;
+  state.alarms.lowLevel2 = state.level <= params.lowLevel2;
+  state.alarms.highLevel = state.level >= params.highLevel;
+  state.alarms.highLevel2 = state.level >= params.highLevel2;
+  
+  // Pressure alarms
+  state.alarms.lowPressure = state.pressure <= params.lowPressure && state.burnerState !== 'off';
+  state.alarms.highPressure = state.pressure >= params.highPressure;
+  
+  // Fuel oil temperature alarms (only when burning HFO)
+  if (state.fuelMode === 'HFO') {
+    state.alarms.foLowTemp = state.fuelOilTemp <= params.foLowTemp;
+    state.alarms.foHighTemp = state.fuelOilTemp >= params.foHighTemp;
+  } else {
+    state.alarms.foLowTemp = false;
+    state.alarms.foHighTemp = false;
+  }
+  
+  // TDS alarm (STAGE 2)
+  state.alarms.highTDS = state.tds >= params.tdsHighAlarm;
+  
+  // High opacity / low O2 alarm (incomplete combustion, smoke)
+  // Only when firing - low O2 during purge/idle is normal
+  state.alarms.highOpacity = state.flameOn && state.o2 < params.o2LowAlarm;
+  
+  // Soot alarms (STAGE 3)
+  state.alarms.highSoot = state.soot.level >= params.sootHighAlarm;
+  // sootFire and sootBlowerFault are set directly by the process/disturbance, not checked here
+  
+  // Steam hammer detection - occurs with rapid demand change + risk conditions
+  // Causes: carryover (high level), condensate in cold lines (low pressure), foaming (high TDS)
+  if (state.steamHammerTimer > 0) {
+    state.steamHammerTimer -= 0.016;  // Cooldown
+    if (state.steamHammerTimer <= 0) {
+      state.alarms.steamHammer = false;
+    }
+  } else {
+    const demandChange = Math.abs(state.steamDemand - state.lastSteamDemand);
+    const rapidChange = demandChange > 0.3;  // Rapid demand change - lowered
+    const highLevelRisk = state.level > 40;  // Carryover risk - lowered
+    const lowPressureRisk = state.pressure < 6 && state.steamDemand > 15;  // Condensate in lines
+    const foamingRisk = state.tds > 2500;  // Foaming causes carryover
+    
+    // Also trigger randomly in ACTIVE dynamics mode when conditions marginal
+    const activeModeRisk = state.dynamics === 'active' && Math.random() < 0.001 && 
+                           (state.level > 30 || state.pressure < 6);
+    
+    if ((rapidChange && (highLevelRisk || lowPressureRisk || foamingRisk)) || activeModeRisk) {
+      state.alarms.steamHammer = true;
+      state.steamHammerTimer = 5 + Math.random() * 5;  // 5-10 seconds of hammering
+      playSteamHammer();  // BANG BANG BANG!
+    }
+  }
+  state.lastSteamDemand = state.steamDemand;
+  
+  // High level 2 stops FW pump (simulated by clamping valve)
+  if (state.alarms.highLevel2) {
+    state.fwValve = 0;  // FW pump trip on very high level
+  }
+  
+  // Trip conditions (with reset lockout to allow recovery)
+  if (state.resetLockout > 0) {
+    state.resetLockout -= 0.016;  // Count down lockout
+  } else {
+    if (state.alarms.lowLevel2 && !state.tripped) {
+      tripBoiler('Low water level');
+    }
+    if (state.alarms.highPressure && !state.tripped) {
+      tripBoiler('High steam pressure');
+    }
+    if (state.alarms.flameFailure && state.burnerState !== 'off' && !state.tripped) {
+      tripBoiler('Flame failure');
+    }
+  }
+  
+  updateAlarmDisplay();
+}
+
+function tripBoiler(reason) {
+  state.tripped = true;
+  state.tripReason = reason;
+  state.flameOn = false;
+  state.firingRate = 0;
+  state.burnerState = 'trip';
+  console.log('BOILER TRIPPED: ' + reason);
+  playTripKlaxon();  // Sound the alarm!
+}
+
+function updateAlarmDisplay() {
+  for (const [key, value] of Object.entries(state.alarms)) {
+    const el = document.getElementById('alarm' + key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, '$1'));
+    // Map to element IDs
+    const mapping = {
+      lowLevel1: 'alarmLowLevel1',
+      lowLevel2: 'alarmLowLevel2',
+      highLevel: 'alarmHighLevel',
+      highLevel2: 'alarmHighLevel2',
+      lowPressure: 'alarmLowPressure',
+      highPressure: 'alarmHighPressure',
+      flameFailure: 'alarmFlameFailure',
+      fanFail: 'alarmFanFail',
+      foLowPress: 'alarmFOLowPress',
+      foHighTemp: 'alarmFOHighTemp',
+      foLowTemp: 'alarmFOLowTemp',
+      highOpacity: 'alarmHighOpacity',
+      steamHammer: 'alarmSteamHammer',
+      bdTimeout: 'alarmBDTimeout',
+      bdStuck: 'alarmBDStuck',
+      highTDS: 'alarmHighTDS',
+      highSoot: 'alarmHighSoot',
+      sootFire: 'alarmSootFire',
+      sootBlowerFault: 'alarmSootBlowerFault'
+    };
+    const elem = document.getElementById(mapping[key]);
+    if (elem) {
+      if (key === 'lowLevel2' || key === 'highPressure' || key === 'flameFailure' || key === 'bdStuck' || key === 'sootFire' || key === 'sootBlowerFault' || key === 'steamHammer') {
+        elem.className = 'alarm-tile' + (value ? ' trip' : '');
+      } else {
+        elem.className = 'alarm-tile' + (value ? ' active' : '');
+      }
+    }
+  }
+}
+
+// === TRENDS ===
+function updateTrends() {
+  // Format time as M:SS
+  const mins = Math.floor(state.time / 60);
+  const secs = Math.floor(state.time % 60);
+  const timeLabel = mins + ':' + secs.toString().padStart(2, '0');
+  
+  trendData.time.push(timeLabel);
+  trendData.pressure.push(state.pressure);
+  trendData.level.push(state.level);
+  trendData.o2.push(state.o2);
+  
+  if (trendData.time.length > trendData.maxPoints) {
+    trendData.time.shift();
+    trendData.pressure.shift();
+    trendData.level.shift();
+    trendData.o2.shift();
+  }
+  
+  trendChart.data.labels = trendData.time;
+  trendChart.data.datasets[0].data = trendData.pressure;
+  trendChart.data.datasets[1].data = trendData.level;
+  trendChart.data.datasets[2].data = trendData.o2;
+  trendChart.update('none');
+}
+
+// === DISPLAY UPDATE ===
+function updateDisplay() {
+  document.getElementById('pvPressure').textContent = state.pressure.toFixed(1);
+  document.getElementById('pvLevel').textContent = state.level.toFixed(0);
+  document.getElementById('pvO2').textContent = state.o2.toFixed(1);
+  document.getElementById('pvFiring').textContent = state.firingRate.toFixed(0);
+  document.getElementById('pvFWValve').textContent = state.fwValve.toFixed(0);
+  document.getElementById('pvSteamFlow').textContent = state.steamFlow.toFixed(1);
+  
+  // FW Flow display - shows FAIL when supply is lost
+  const fwFlowEl = document.getElementById('pvFWFlow');
+  if (state.fwPumpTripped) {
+    fwFlowEl.textContent = 'FAIL';
+    fwFlowEl.style.color = '#ff0040';
+  } else {
+    fwFlowEl.textContent = state.fwFlow.toFixed(1);
+    fwFlowEl.style.color = 'var(--water)';
+  }
+  
+  // FO Temp display (only visible in HFO mode)
+  const foTempRow = document.getElementById('pvFOTempRow');
+  const foTempEl = document.getElementById('pvFOTemp');
+  if (state.fuelMode === 'HFO') {
+    foTempRow.style.display = 'flex';
+    foTempEl.textContent = state.fuelOilTemp.toFixed(0);
+    // Colour code based on alarm limits
+    if (state.fuelOilTemp <= params.foLowTemp) {
+      foTempEl.style.color = '#fc8181';  // Red - too cold, poor atomisation
+    } else if (state.fuelOilTemp >= params.foHighTemp) {
+      foTempEl.style.color = '#fc8181';  // Red - too hot, coking risk
+    } else {
+      foTempEl.style.color = '#68d391';  // Green - within range
+    }
+  } else {
+    foTempRow.style.display = 'none';
+  }
+}
+
+// === USER CONTROLS ===
+function startBurner() {
+  if (state.burnerState === 'off' && !state.tripped) {
+    state.burnerState = 'purge';
+    state.burnerTimer = 0;
+  }
+}
+
+function stopBurner() {
+  // SAACKE style: go through post-purge before full stop
+  state.flameOn = false;
+  state.burnerState = 'post-purge';
+  state.burnerTimer = 0;
+}
+
+function resetTrip() {
+  // Clear trip state only - boiler stays where it is
+  state.tripped = false;
+  state.tripReason = '';
+  state.resetLockout = 5;  // 5 seconds to recover before re-trip possible
+  
+  // If burner was tripped, set to off (ready for restart), otherwise leave running
+  if (state.burnerState === 'trip') {
+    state.burnerState = 'off';
+    state.flameOn = false;
+    state.firingRate = 0;
+  }
+  
+  // Clear all latching alarms (faults that need manual reset)
+  state.alarms.flameFailure = false;
+  state.alarms.foLowPress = false;
+  state.alarms.fanFail = false;
+  state.alarms.bdTimeout = false;
+  state.alarms.bdStuck = false;
+  // Note: level/pressure alarms are live - they clear when condition clears
+  
+  // Clear sensor faults
+  state.sensorFaults.levelTx = 'normal';
+  state.sensorFaults.pressureTx = 'normal';
+  state.sensorFaults.steamFlowTx = 'normal';
+  
+  // Reset blowdown stuck state (STAGE 2)
+  state.bottomBD.stuck = false;
+  state.bottomBD.open = false;
+  state.bottomBD.timer = 0;
+  stopBottomBD();  // Reset UI
+  
+  // Reset soot blower fault state (STAGE 3)
+  if (state.soot.blowerState === 'fault') {
+    state.soot.blowerState = 'ready';
+  }
+  state.soot.blowerTimer = 0;
+  state.soot.fireActive = false;
+  state.alarms.sootFire = false;
+  state.alarms.sootBlowerFault = false;
+  
+  // Clear FW pump trip
+  state.fwPumpTripped = false;
+  state.fwPumpTripTimer = 0;
+  
+  updateBurnerStatusDisplay();
+  updateAlarmDisplay();
+  updateBlowdownDisplay();
+  updateSootBlowDisplay();
+  
+  console.log('FAULTS CLEARED - Boiler ready');
+}
+
+function updatePressureSP() {
+  state.pressureSP = parseFloat(document.getElementById('pressureSP').value);
+  document.getElementById('pressureSPDisplay').textContent = state.pressureSP.toFixed(1) + ' bar';
+}
+
+function updateLevelSP() {
+  state.levelSP = parseFloat(document.getElementById('levelSP').value);
+  document.getElementById('levelSPDisplay').textContent = state.levelSP.toFixed(0) + ' mm';
+}
+
+function updateO2SP() {
+  state.o2SP = parseFloat(document.getElementById('o2SP').value);
+  document.getElementById('o2SPDisplay').textContent = state.o2SP.toFixed(1) + '%';
+}
+
+function updateSteamDemand() {
+  state.steamDemand = parseFloat(document.getElementById('steamDemand').value);
+  document.getElementById('steamDemandDisplay').textContent = state.steamDemand.toFixed(0) + '%';
+  
+  // Manual adjustment switches dynamics off
+  if (state.dynamics !== 'off') {
+    setDynamics('off');
+  }
+  state.dynamicsDemandTarget = state.steamDemand;
+}
+
+function updateManualFiring() {
+  state.manualFiring = parseFloat(document.getElementById('manualFiring').value);
+  document.getElementById('manualFiringDisplay').textContent = state.manualFiring.toFixed(0) + '%';
+}
+
+function setPressureMode(mode) {
+  state.pressureMode = mode;
+  document.getElementById('pressureAuto').className = 'toggle-btn' + (mode === 'auto' ? ' active' : '');
+  document.getElementById('pressureMan').className = 'toggle-btn' + (mode === 'manual' ? ' active' : '');
+  document.getElementById('manualFiringRow').style.display = mode === 'manual' ? 'flex' : 'none';
+  document.getElementById('manualFiringSlider').style.display = mode === 'manual' ? 'block' : 'none';
+}
+
+function setLevelMode(mode) {
+  state.levelMode = mode;
+  document.getElementById('levelManual').className = 'toggle-btn' + (mode === 0 ? ' active' : '');
+  document.getElementById('level1Elem').className = 'toggle-btn' + (mode === 1 ? ' active' : '');
+  document.getElementById('level3Elem').className = 'toggle-btn' + (mode === 3 ? ' active' : '');
+  
+  // Show/hide manual FW valve control
+  document.getElementById('manualFWControl').style.display = mode === 0 ? 'block' : 'none';
+  
+  // Reset integral when switching modes
+  controllers.levelIntegral = 0;
+}
+
+function updateManualFW() {
+  state.manualFW = parseFloat(document.getElementById('manualFW').value);
+  document.getElementById('manualFWDisplay').textContent = state.manualFW.toFixed(0) + '%';
+}
+
+function setO2Mode(mode) {
+  state.o2Mode = mode;
+  document.getElementById('o2Auto').className = 'toggle-btn' + (mode === 'auto' ? ' active' : '');
+  document.getElementById('o2Man').className = 'toggle-btn' + (mode === 'manual' ? ' active' : '');
+}
+
+function setFuelMode(mode) {
+  state.fuelMode = mode;
+  document.getElementById('fuelHFO').className = 'toggle-btn' + (mode === 'HFO' ? ' active' : '');
+  document.getElementById('fuelMDO').className = 'toggle-btn' + (mode === 'MDO' ? ' active' : '');
+  
+  // Show/hide FO temp controls based on fuel mode
+  const showFOTemp = mode === 'HFO';
+  document.getElementById('foTempRow').style.display = showFOTemp ? 'flex' : 'none';
+  document.getElementById('foTempSlider').style.display = showFOTemp ? 'block' : 'none';
+  
+  // Reset FO temp alarms when switching to MDO
+  if (mode === 'MDO') {
+    state.alarms.foLowTemp = false;
+    state.alarms.foHighTemp = false;
+  }
+}
+
+function updateFOTemp() {
+  state.fuelOilTemp = parseFloat(document.getElementById('foTemp').value);
+  const display = document.getElementById('foTempDisplay');
+  display.textContent = state.fuelOilTemp.toFixed(0) + '°C';
+  
+  // Colour code based on alarm state
+  if (state.fuelOilTemp <= params.foLowTemp) {
+    display.style.color = '#fc8181';  // Red - too cold
+  } else if (state.fuelOilTemp >= params.foHighTemp) {
+    display.style.color = '#fc8181';  // Red - too hot
+  } else {
+    display.style.color = '#68d391';  // Green - good
+  }
+}
+
+function setSpeed(speed) {
+  state.speed = speed;
+  document.querySelectorAll('.speed-btn').forEach((btn, i) => {
+    btn.className = 'speed-btn' + ([1, 2, 4, 10][i] === speed ? ' active' : '');
+  });
+}
+
+// === TAB SWITCHING ===
+function switchTab(tabName) {
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  event.target.classList.add('active');
+  
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.remove('active');
+  });
+  document.getElementById('tab-' + tabName).classList.add('active');
+}
+
+// === BLOWDOWN CONTROLS (STAGE 2) ===
+function startBottomBD() {
+  if (!state.bottomBD.stuck) {
+    state.bottomBD.open = true;
+    document.getElementById('btnBottomBD').classList.add('active');
+    document.getElementById('bottomBDStatus').textContent = 'OPEN';
+    document.getElementById('bottomBDStatus').style.color = 'var(--water)';
+  }
+}
+
+function stopBottomBD() {
+  if (!state.bottomBD.stuck) {
+    state.bottomBD.open = false;
+    state.bottomBD.timer = 0;
+    document.getElementById('btnBottomBD').classList.remove('active');
+    document.getElementById('bottomBDStatus').textContent = 'CLOSED';
+    document.getElementById('bottomBDStatus').style.color = 'var(--muted)';
+    document.getElementById('bottomBDProgress').style.width = '0%';
+    document.getElementById('bottomBDTimer').textContent = '0 / 10s';
+    state.alarms.bdTimeout = false;
+  }
+}
+
+function updateSurfaceBD() {
+  state.surfaceBD.position = parseFloat(document.getElementById('surfaceBD').value);
+  state.surfaceBD.open = state.surfaceBD.position > 0;
+  document.getElementById('surfaceBDDisplay').textContent = state.surfaceBD.position.toFixed(0) + '%';
+}
+
+function setContBDMode(mode) {
+  state.continuousBD.mode = mode;
+  document.getElementById('contBDAuto').className = 'toggle-btn' + (mode === 'auto' ? ' active' : '');
+  document.getElementById('contBDMan').className = 'toggle-btn' + (mode === 'manual' ? ' active' : '');
+  document.getElementById('contBDManualRow').style.display = mode === 'manual' ? 'flex' : 'none';
+  document.getElementById('contBDManualSlider').style.display = mode === 'manual' ? 'block' : 'none';
+}
+
+function updateContBDManual() {
+  state.continuousBD.manualSP = parseFloat(document.getElementById('contBDManual').value);
+  document.getElementById('contBDManualDisplay').textContent = state.continuousBD.manualSP.toFixed(0) + '%';
+}
+
+function updateTdsSP() {
+  state.tdsSP = parseFloat(document.getElementById('tdsSP').value);
+  document.getElementById('tdsSPDisplay').textContent = state.tdsSP.toFixed(0) + ' ppm';
+}
+
+function updateBlowdownDisplay() {
+  // Bottom BD progress bar
+  const progress = (state.bottomBD.timer / state.bottomBD.maxTime) * 100;
+  document.getElementById('bottomBDProgress').style.width = progress + '%';
+  document.getElementById('bottomBDTimer').textContent = state.bottomBD.timer.toFixed(1) + ' / ' + state.bottomBD.maxTime + 's';
+  
+  // Warning state for bottom BD button
+  const btn = document.getElementById('btnBottomBD');
+  if (state.bottomBD.stuck) {
+    btn.className = 'bd-btn stuck';
+    btn.textContent = '⚠ STUCK OPEN';
+    document.getElementById('bottomBDStatus').textContent = 'STUCK!';
+    document.getElementById('bottomBDStatus').style.color = 'var(--trip)';
+  } else if (state.alarms.bdTimeout) {
+    btn.className = 'bd-btn warning';
+  } else if (state.bottomBD.open) {
+    btn.className = 'bd-btn active';
+  } else {
+    btn.className = 'bd-btn';
+    btn.textContent = '⬇ HOLD TO BLOW';
+  }
+  
+  // Continuous BD valve position
+  document.getElementById('contBDValveDisplay').textContent = state.continuousBD.valve.toFixed(0) + '%';
+  
+  // TDS display with colour coding
+  const tdsEl = document.getElementById('pvTDS');
+  tdsEl.textContent = state.tds.toFixed(0);
+  if (state.tds >= params.tdsHighAlarm) {
+    tdsEl.style.color = '#fc8181';  // Red - high
+  } else if (state.tds >= state.tdsSP) {
+    tdsEl.style.color = '#d69e2e';  // Yellow - approaching limit
+  } else {
+    tdsEl.style.color = '#68d391';  // Green - OK
+  }
+  
+  // Soot display with colour coding
+  const sootEl = document.getElementById('pvSoot');
+  if (sootEl) {
+    sootEl.textContent = state.soot.level.toFixed(0);
+    if (state.soot.level >= params.sootFireRisk) {
+      sootEl.style.color = '#fc8181';  // Red - fire risk
+    } else if (state.soot.level >= params.sootHighAlarm) {
+      sootEl.style.color = '#d69e2e';  // Yellow - high
+    } else {
+      sootEl.style.color = '#68d391';  // Green - OK
+    }
+  }
+}
+
+// === SOOT BLOW CONTROLS (STAGE 3) ===
+function startSootBlow() {
+  // Check interlocks
+  if (!canSootBlow()) {
+    console.log('Soot blow blocked by interlocks');
+    return;
+  }
+  
+  // Start sequence
+  state.soot.blowerState = 'extending';
+  state.soot.blowerTimer = 0;
+  updateSootBlowDisplay();
+}
+
+function canSootBlow() {
+  // Must be firing
+  if (!state.flameOn) return false;
+  // Must have adequate steam pressure
+  if (state.pressure < params.sootBlowMinPressure) return false;
+  // Must not already be in sequence
+  if (state.soot.blowerState !== 'ready') return false;
+  // Must not have fault
+  if (state.alarms.sootBlowerFault) return false;
+  
+  return true;
+}
+
+function updateSootBlowSequence(dt) {
+  // Soot blow sequence is handled in updateProcess() to properly affect steam flow
+  // This function is now just a placeholder for the main loop call
+}
+
+function updateSootBlowDisplay() {
+  const statusEl = document.getElementById('sootBlowerStatus');
+  const btn = document.getElementById('btnSootBlow');
+  const progressBar = document.getElementById('sootBlowProgress');
+  const timerEl = document.getElementById('sootBlowTimer');
+  
+  // Status text and button state
+  const statusLabels = {
+    'ready': 'READY',
+    'extending': 'EXTENDING...',
+    'blowing': 'BLOWING',
+    'retracting': 'RETRACTING...',
+    'fault': 'FAULT'
+  };
+  statusEl.textContent = statusLabels[state.soot.blowerState];
+  
+  // Status colour
+  if (state.soot.blowerState === 'fault') {
+    statusEl.style.color = '#ff0040';
+  } else if (state.soot.blowerState === 'blowing') {
+    statusEl.style.color = '#68d391';
+  } else if (state.soot.blowerState !== 'ready') {
+    statusEl.style.color = '#d69e2e';
+  } else {
+    statusEl.style.color = 'var(--muted)';
+  }
+  
+  // Button state
+  btn.disabled = !canSootBlow();
+  btn.className = 'soot-btn' + (state.soot.blowerState !== 'ready' ? ' active' : '') + (state.soot.blowerState === 'fault' ? ' fault' : '');
+  
+  // Progress bar
+  let progress = 0;
+  let totalTime = params.sootBlowExtendTime + params.sootBlowActiveTime + params.sootBlowRetractTime;
+  let elapsed = state.soot.blowerTimer;
+  
+  switch (state.soot.blowerState) {
+    case 'extending':
+      progress = (elapsed / totalTime) * 100;
+      break;
+    case 'blowing':
+      progress = ((params.sootBlowExtendTime + elapsed) / totalTime) * 100;
+      break;
+    case 'retracting':
+      progress = ((params.sootBlowExtendTime + params.sootBlowActiveTime + elapsed) / totalTime) * 100;
+      break;
+  }
+  progressBar.style.width = progress + '%';
+  
+  // Timer display
+  if (state.soot.blowerState === 'ready') {
+    timerEl.textContent = '0 / ' + totalTime.toFixed(0) + 's';
+  } else {
+    let totalElapsed = state.soot.blowerTimer;
+    if (state.soot.blowerState === 'blowing') totalElapsed += params.sootBlowExtendTime;
+    if (state.soot.blowerState === 'retracting') totalElapsed += params.sootBlowExtendTime + params.sootBlowActiveTime;
+    timerEl.textContent = totalElapsed.toFixed(0) + ' / ' + totalTime.toFixed(0) + 's';
+  }
+  
+  // Sequence step indicators
+  document.getElementById('seqReady').className = 'seq-step' + (state.soot.blowerState === 'ready' ? ' active' : '');
+  document.getElementById('seqInsert').className = 'seq-step' + (state.soot.blowerState === 'extending' ? ' active' : '');
+  document.getElementById('seqBlow').className = 'seq-step' + (state.soot.blowerState === 'blowing' ? ' active' : '');
+  document.getElementById('seqRetract').className = 'seq-step' + (state.soot.blowerState === 'retracting' ? ' active' : '');
+  
+  // Fouling display
+  const foulingEl = document.getElementById('foulingDisplay');
+  const foulingBar = document.getElementById('foulingBar');
+  foulingEl.textContent = state.soot.level.toFixed(0) + '%';
+  foulingBar.style.width = state.soot.level + '%';
+  
+  // Colour code fouling
+  if (state.soot.level >= params.sootFireRisk) {
+    foulingEl.style.color = '#ff0040';
+  } else if (state.soot.level >= params.sootHighAlarm) {
+    foulingEl.style.color = '#fc8181';
+  } else if (state.soot.level >= 30) {
+    foulingEl.style.color = '#d69e2e';
+  } else {
+    foulingEl.style.color = '#68d391';
+  }
+  
+  // Efficiency display
+  const effEl = document.getElementById('efficiencyDisplay');
+  const efficiency = Math.max(0, 100 - state.soot.level * params.sootEfficiencyLoss);
+  effEl.textContent = efficiency.toFixed(0) + '%';
+  effEl.style.color = efficiency >= 90 ? '#68d391' : efficiency >= 70 ? '#d69e2e' : '#fc8181';
+  
+  // Interlocks
+  document.getElementById('interlockBurner').className = 'interlock-row' + (state.flameOn ? ' ok' : '');
+  document.getElementById('interlockPressure').className = 'interlock-row' + (state.pressure >= params.sootBlowMinPressure ? ' ok' : '');
+  document.getElementById('interlockSequence').className = 'interlock-row' + (state.soot.blowerState === 'ready' ? ' ok' : '');
+}
+
+// === SCENARIO SYSTEM ===
+function selectScenario() {
+  const select = document.getElementById('scenarioSelect');
+  const scenarioId = select.value;
+  
+  if (!scenarioId) {
+    document.getElementById('scenarioInfo').style.display = 'none';
+    document.getElementById('scenarioButtons').style.display = 'none';
+    document.getElementById('scenarioStatus').textContent = '';
+    document.getElementById('scenarioStatus').className = 'scenario-status';
+    activeScenario = null;
+    return;
+  }
+  
+  const scenario = scenarios[scenarioId];
+  activeScenario = scenarioId;
+  
+  document.getElementById('scenarioTitle').textContent = scenario.title;
+  document.getElementById('scenarioDesc').textContent = scenario.desc;
+  document.getElementById('scenarioObjective').textContent = '🎯 ' + scenario.objective;
+  document.getElementById('scenarioInfo').style.display = 'block';
+  document.getElementById('scenarioButtons').style.display = 'flex';
+  document.getElementById('scenarioStatus').textContent = 'Ready to start';
+  document.getElementById('scenarioStatus').className = 'scenario-status';
+}
+
+function startScenario() {
+  if (!activeScenario) return;
+  
+  const scenario = scenarios[activeScenario];
+  
+  // Reset simulation first
+  resetTrip();
+  
+  // Clear sensor faults
+  state.sensorFaults.levelTx = 'normal';
+  state.sensorFaults.pressureTx = 'normal';
+  state.sensorFaults.steamFlowTx = 'normal';
+  
+  // Apply setup conditions
+  const setup = scenario.setup;
+  
+  if (setup.steamDemand !== undefined) {
+    state.steamDemand = setup.steamDemand;
+    document.getElementById('steamDemand').value = setup.steamDemand;
+    document.getElementById('steamDemandDisplay').textContent = setup.steamDemand + '%';
+  }
+  
+  if (setup.levelMode !== undefined) {
+    setLevelMode(setup.levelMode);
+  }
+  
+  if (setup.pressureMode === 'manual') {
+    setPressureMode('manual');
+  }
+  
+  if (setup.startLevel !== undefined) {
+    state.level = setup.startLevel;
+  }
+  
+  if (setup.startTDS !== undefined) {
+    state.tds = setup.startTDS;
+  }
+  
+  if (setup.startSoot !== undefined) {
+    state.soot.level = setup.startSoot;
+  }
+  
+  // Start boiler if required
+  if (setup.runBoiler) {
+    // Quick start - skip to running state
+    state.pressure = 7.0;
+    state.burnerState = 'high-fire';
+    state.flameOn = true;
+    state.firingRate = 50;
+    state.fwValve = 50;
+    state.level = setup.startLevel || 0;
+    updateBurnerStatusDisplay();
+  }
+  
+  // Default all controllers to manual - trainee must control
+  setLevelMode(0);  // Manual FW valve
+  state.manualFW = state.fwValve;  // Match current valve position
+  document.getElementById('manualFW').value = state.manualFW;
+  document.getElementById('manualFWDisplay').textContent = state.manualFW.toFixed(0) + '%';
+  
+  // Start scenario timer
+  scenarioRunning = true;
+  scenarioStartTime = state.time;
+  scenarioEventIndex = 0;
+  
+  // Hide scenario details from trainee view (instructor already knows)
+  document.getElementById('scenarioInfo').style.display = 'none';
+  document.getElementById('scenarioStatus').textContent = '⏱ SCENARIO RUNNING...';
+  document.getElementById('scenarioStatus').className = 'scenario-status running';
+}
+
+function stopScenario() {
+  scenarioRunning = false;
+  // Show scenario info again when stopped
+  if (activeScenario) {
+    document.getElementById('scenarioInfo').style.display = 'block';
+  }
+  document.getElementById('scenarioStatus').textContent = 'Scenario stopped';
+  document.getElementById('scenarioStatus').className = 'scenario-status';
+}
+
+function updateScenario(dt) {
+  if (!scenarioRunning || !activeScenario) return;
+  
+  const scenario = scenarios[activeScenario];
+  const elapsed = state.time - scenarioStartTime;
+  
+  // Check for timed events
+  while (scenarioEventIndex < scenario.events.length) {
+    const event = scenario.events[scenarioEventIndex];
+    if (elapsed >= event.time) {
+      // Trigger the event
+      if (event.action === 'steamDown') {
+        // Special case: reduce steam demand
+        state.steamDemand = Math.max(20, state.steamDemand - 30);
+        document.getElementById('steamDemand').value = state.steamDemand;
+        document.getElementById('steamDemandDisplay').textContent = state.steamDemand.toFixed(0) + '%';
+      } else {
+        injectDisturbance(event.action);
+      }
+      scenarioEventIndex++;
+    } else {
+      break;
+    }
+  }
+  
+  // Check fail conditions
+  for (const condition of scenario.failConditions) {
+    if (state.alarms[condition]) {
+      scenarioRunning = false;
+      document.getElementById('scenarioStatus').textContent = '❌ FAILED - ' + condition.toUpperCase();
+      document.getElementById('scenarioStatus').className = 'scenario-status failed';
+      return;
+    }
+  }
+  
+  // Check time limit
+  if (scenario.timeLimit && elapsed >= scenario.timeLimit) {
+    scenarioRunning = false;
+    document.getElementById('scenarioStatus').textContent = '✓ SCENARIO COMPLETE';
+    document.getElementById('scenarioStatus').className = 'scenario-status success';
+    return;
+  }
+  
+  // Update status with time remaining
+  const remaining = Math.ceil(scenario.timeLimit - elapsed);
+  document.getElementById('scenarioStatus').textContent = '⏱ RUNNING... ' + remaining + 's remaining';
+}
+
+function injectDisturbance(type) {
+  switch (type) {
+    case 'steamStep':
+      state.steamDemand = Math.min(100, state.steamDemand + 20);
+      document.getElementById('steamDemand').value = state.steamDemand;
+      document.getElementById('steamDemandDisplay').textContent = state.steamDemand.toFixed(0) + '%';
+      break;
+      
+    case 'fwPumpTrip':
+      state.fwPumpTripped = true;
+      state.fwPumpTripTimer = 5;
+      break;
+      
+    case 'flameFail':
+      if (state.flameOn) {
+        state.flameOn = false;
+        state.alarms.flameFailure = true;
+      }
+      break;
+      
+    case 'foLowPress':
+      state.alarms.foLowPress = true;
+      setTimeout(() => { state.alarms.foLowPress = false; }, 5000);
+      break;
+      
+    case 'foHeaterFail':
+      if (state.fuelMode === 'HFO') {
+        state.fuelOilTemp = 90;
+        document.getElementById('foTemp').value = state.fuelOilTemp;
+        updateFOTemp();
+      }
+      break;
+      
+    case 'bdStuck':
+      // Bottom blowdown valve stuck open
+      state.bottomBD.stuck = true;
+      state.bottomBD.open = true;
+      state.alarms.bdStuck = true;
+      break;
+      
+    case 'highTDS':
+      // Simulate contaminated feedwater causing TDS spike
+      state.tds = Math.min(4000, state.tds + 1000);
+      break;
+      
+    case 'sootBuildUp':
+      // Rapid soot accumulation (simulates poor combustion period)
+      state.soot.level = Math.min(100, state.soot.level + 40);
+      break;
+      
+    case 'sootBlowerStuck':
+      // Soot blower stuck during sequence
+      if (state.soot.blowerState !== 'ready') {
+        state.soot.blowerState = 'fault';
+        state.alarms.sootBlowerFault = true;
+      } else {
+        // If not in sequence, start one then fault it
+        state.soot.blowerState = 'extending';
+        setTimeout(() => {
+          state.soot.blowerState = 'fault';
+          state.alarms.sootBlowerFault = true;
+        }, 1500);
+      }
+      break;
+      
+    // === SENSOR FAILURES ===
+    case 'levelTxFailLow':
+      freezeSensor('level');
+      state.sensorFaults.levelTx = 'failLow';
+      break;
+      
+    case 'levelTxFailHigh':
+      freezeSensor('level');
+      state.sensorFaults.levelTx = 'failHigh';
+      break;
+      
+    case 'levelTxFrozen':
+      freezeSensor('level');
+      state.sensorFaults.levelTx = 'frozen';
+      break;
+      
+    case 'steamFlowTxFail':
+      freezeSensor('steamFlow');
+      state.sensorFaults.steamFlowTx = 'failLow';
+      break;
+      
+    case 'clearSensorFaults':
+      state.sensorFaults.levelTx = 'normal';
+      state.sensorFaults.pressureTx = 'normal';
+      state.sensorFaults.steamFlowTx = 'normal';
+      break;
+      
+    case 'steamHammer':
+      // Manual trigger for testing sound
+      state.alarms.steamHammer = true;
+      state.steamHammerTimer = 3;
+      playSteamHammer();
+      break;
+  }
+}
+
+// Initialize on load
+window.onload = init;
+</script>
+
+</body>
+</html>

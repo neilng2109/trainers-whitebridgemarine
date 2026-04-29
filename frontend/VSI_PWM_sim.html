@@ -1,0 +1,4142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <!-- VERSION 5.1 - Step Works for Motor/Pod -->
+  <title>VSI PWM Propulsion Drive Simulator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+:root {
+  --bg: #0a0e14;
+  --panel: #12181f;
+  --border: #2a3441;
+  --text: #e2e8f0;
+  --muted: #718096;
+  --accent: #00d4ff;
+  --power-motor: #4ade80;
+  --power-regen: #f59e0b;
+  --warning: #f59e0b;
+  --alarm: #ef4444;
+  --ok: #22c55e;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+header {
+  background: linear-gradient(135deg, #1a1f2e 0%, #0d1117 100%);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: 60px;
+}
+
+header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+
+.header-logo {
+  height: 48px;
+  width: auto;
+}
+
+.badge {
+  background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+  color: white;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.sound-btn, .pause-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+  border: 1px solid #718096;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sound-btn:hover, .pause-btn:hover {
+  background: linear-gradient(135deg, #5a6578 0%, #3d4758 100%);
+}
+
+.sound-btn.active {
+  background: linear-gradient(135deg, #2f855a 0%, #276749 100%);
+  border-color: #48bb78;
+}
+
+.pause-btn.paused {
+  background: linear-gradient(135deg, #d69e2e 0%, #b7791f 100%);
+  border-color: #ecc94b;
+}
+
+.main-container {
+  margin-top: 60px;
+  display: grid;
+  grid-template-columns: 180px 1fr 240px;
+  min-height: calc(100vh - 60px);
+}
+
+/* Telegraph Panel */
+.telegraph-panel {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.telegraph {
+  width: 140px;
+  height: 320px;
+  background: linear-gradient(180deg, #1a1f2e 0%, #0d1117 100%);
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+}
+
+.telegraph-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.telegraph-scale {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+}
+
+.telegraph-mark {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 8px;
+  padding-right: 45px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.telegraph-rpm {
+  color: #718096;
+  margin-right: 6px;
+  font-size: 9px;
+  min-width: 22px;
+  text-align: right;
+}
+
+.telegraph-mark.ahead { color: var(--power-motor); }
+.telegraph-mark.stop { color: var(--alarm); }
+.telegraph-mark.astern { color: var(--power-regen); }
+
+.telegraph-track {
+  position: absolute;
+  left: 75%;
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  background: #2a3441;
+  border-radius: 3px;
+  transform: translateX(-50%);
+}
+
+.telegraph-handle {
+  position: absolute;
+  left: 75%;
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  height: 20px;
+  min-height: 20px;
+  max-height: 20px;
+  background: linear-gradient(180deg, #4a5568 0%, #2d3748 100%);
+  border: 2px solid #718096;
+  border-radius: 4px;
+  transform: translateX(-20%);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  font-weight: 700;
+  transition: top 0.1s;
+}
+
+.telegraph-handle:active { cursor: grabbing; }
+
+.telegraph-handle.ahead { 
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+  border-color: #4ade80;
+}
+
+.telegraph-handle.astern { 
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  border-color: #fbbf24;
+}
+
+.telegraph-readout {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.telegraph-direction {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.telegraph-direction.ahead { color: var(--power-motor); }
+.telegraph-direction.stop { color: var(--muted); }
+.telegraph-direction.astern { color: var(--power-regen); }
+
+.telegraph-percent {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: 'Consolas', monospace;
+  color: var(--text);
+  min-width: 100px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.drive-controls {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drive-btn {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.drive-btn.start {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border-color: #4ade80;
+  color: white;
+}
+
+.drive-btn.stop {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border-color: #f87171;
+  color: white;
+}
+
+.drive-btn.estop {
+  background: linear-gradient(135deg, #7c2d12 0%, #991b1b 100%);
+  border-color: #ef4444;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.drive-btn.estop.engaged {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border-color: #fca5a5;
+  animation: estop-pulse 0.5s infinite alternate;
+}
+
+@keyframes estop-pulse {
+  from { box-shadow: 0 0 10px #ef4444; }
+  to { box-shadow: 0 0 20px #ef4444, 0 0 30px #ef444466; }
+}
+
+.drive-btn.reset {
+  background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
+  border-color: #3b82f6;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.drive-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.half-motor-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.half-motor-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--warning);
+}
+
+/* Main Overview Panel */
+.overview-panel {
+  padding: 20px;
+  padding-bottom: 60px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: calc(100vh - 120px);
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Power Flow Diagram */
+.power-flow-container {
+  background: var(--panel);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 16px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.power-flow-svg {
+  width: 100%;
+  height: auto;
+  min-height: 200px;
+  max-height: 350px;
+  display: block;
+}
+
+.power-flow-svg * {
+  pointer-events: none;
+}
+
+.power-mode-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.power-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.3;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.power-mode.active {
+  opacity: 1;
+}
+
+.power-mode.motoring {
+  background: rgba(74, 222, 128, 0.2);
+  border: 1px solid var(--power-motor);
+  color: var(--power-motor);
+}
+
+.power-mode.regen {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid var(--power-regen);
+  color: var(--power-regen);
+}
+
+.power-mode.stopped {
+  background: rgba(113, 128, 150, 0.2);
+  border: 1px solid var(--muted);
+  color: var(--muted);
+}
+
+/* Auxiliary Systems */
+.aux-systems {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.aux-panel {
+  background: var(--panel);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 12px;
+}
+
+.aux-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.aux-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+.aux-label {
+  color: var(--muted);
+}
+
+.aux-value {
+  font-family: 'Consolas', monospace;
+  font-weight: 600;
+}
+
+.aux-value.ok { color: var(--ok); }
+.aux-value.warning { color: var(--warning); }
+.aux-value.alarm { color: var(--alarm); }
+
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.status-indicator.ok { background: var(--ok); }
+.status-indicator.warning { background: var(--warning); animation: pulse 1s infinite; }
+.status-indicator.alarm { background: var(--alarm); animation: flash 0.5s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Cooling System */
+.cooling-container {
+  background: var(--panel);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 16px;
+}
+
+.cooling-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+.cooling-block {
+  text-align: center;
+  padding: 8px 12px;
+  background: var(--panel);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  min-width: 80px;
+}
+
+.cooling-block-title {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.cooling-block-value {
+  font-family: 'Consolas', monospace;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cooling-arrow {
+  color: var(--accent);
+  font-size: 18px;
+}
+
+/* Right Panel - Status */
+.status-panel {
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+/* Motor Data */
+.motor-data {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.motor-gauge {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.motor-speed {
+  font-size: 36px;
+  font-weight: 700;
+  font-family: 'Consolas', monospace;
+  color: var(--accent);
+}
+
+.motor-speed-unit {
+  font-size: 14px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.motor-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.motor-stat {
+  text-align: center;
+  padding: 8px;
+  background: var(--panel);
+  border-radius: 6px;
+}
+
+.motor-stat-value {
+  font-family: 'Consolas', monospace;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.motor-stat-label {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* Alarms */
+.alarm-panel {
+  background: #000;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.alarm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.alarm-tile {
+  padding: 6px 4px;
+  text-align: center;
+  font-size: 8px;
+  font-weight: 600;
+  border-radius: 3px;
+  background: #1a1f2e;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.alarm-tile.active {
+  background: var(--warning);
+  color: #000;
+  animation: pulse 1s infinite;
+}
+
+.alarm-tile.trip {
+  background: var(--alarm);
+  color: #fff;
+  animation: flash 0.5s infinite;
+}
+
+/* DC Link Trend */
+.trend-container {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 8px;
+  height: 120px;
+}
+
+.trend-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Footer */
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  padding: 8px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  z-index: 100;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-logo {
+  height: 24px;
+  opacity: 0.8;
+}
+
+.footer-time {
+  font-family: 'Consolas', monospace;
+  color: var(--accent);
+}
+
+/* Zoom Modal */
+.zoom-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+}
+
+.zoom-modal.active {
+  display: flex !important;
+}
+
+.zoom-content {
+  background: var(--panel);
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+  width: 95%;
+  max-width: 1100px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.zoom-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, #1a1f2e 0%, #0d1117 100%);
+  gap: 16px;
+}
+
+.zoom-header h2 {
+  font-size: 16px;
+  color: var(--accent);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.zoom-controls {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+
+.zoom-ctrl-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.zoom-ctrl-btn:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.zoom-ctrl-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+}
+
+.zoom-close {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.zoom-close:hover {
+  background: var(--alarm);
+  border-color: var(--alarm);
+}
+
+.zoom-body {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.zoom-svg {
+  width: 100%;
+  height: 500px;
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+/* Clickable components */
+.component-clickable {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.component-clickable:hover {
+  filter: brightness(1.3);
+}
+
+/* ── Pin button (master modal) ── */
+.zoom-pin {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  height: 36px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-right: 8px;
+  padding: 0 12px;
+}
+.zoom-pin:hover { background: var(--accent); border-color: var(--accent); color: #000; }
+
+/* ── Independent pinned panels (clones of master modal) ── */
+.pinned-panel {
+  position: fixed;
+  pointer-events: none;
+  display: block !important;
+}
+.pinned-panel .zoom-content {
+  pointer-events: all;
+  width: 100%; max-width: none; max-height: 70vh;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.85), 0 0 0 2px rgba(0,212,255,0.4);
+}
+.pinned-panel .zoom-body  { padding: 10px; }
+.pinned-panel .zoom-svg   { height: 320px; }
+.pinned-panel .zoom-header { padding: 7px 10px; cursor: move; }
+.pinned-panel .zoom-header h2 { font-size: 12px; }
+.pinned-panel .zoom-controls  { gap: 3px; }
+.pinned-panel .zoom-ctrl-btn  { padding: 3px 7px; font-size: 10px; }
+.pinned-panel .zoom-close     { width: 26px; height: 26px; font-size: 13px; }
+.pinned-badge {
+  background: var(--accent); color: #000;
+  font-size: 9px; font-weight: 700; padding: 2px 8px;
+  border-radius: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+  margin-right: 6px; display: inline-block;
+}
+
+/* ── Resize handle for pinned panels ── */
+.pinned-panel .zoom-content {
+  position: relative;
+}
+.pinned-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+.pinned-resize-handle:hover { opacity: 1; }
+.pinned-resize-handle svg { display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="data:image/jpeg;base64,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" alt="Whitebridge Marine" class="header-logo">
+  <h1>⚡ VSI PWM Propulsion Drive</h1>
+  <span class="badge">Stage 1</span>
+  <span class="subtitle">Overview | Power Flow | Cooling</span>
+  <div class="header-right">
+    <button class="sound-btn" id="soundBtn" onclick="toggleSound()">🔇 Sound OFF</button>
+    <button class="pause-btn" id="pauseBtn" onclick="togglePause()">⏸ PAUSE</button>
+  </div>
+</header>
+
+<div class="main-container">
+
+  <!-- Telegraph Panel -->
+  <div class="telegraph-panel">
+    <div class="telegraph">
+      <div class="telegraph-title">Telegraph</div>
+      <div class="telegraph-scale">
+        <div class="telegraph-mark ahead"><span class="telegraph-rpm">150</span>FULL AHD</div>
+        <div class="telegraph-mark ahead"><span class="telegraph-rpm">75</span>HALF</div>
+        <div class="telegraph-mark ahead"><span class="telegraph-rpm">38</span>SLOW</div>
+        <div class="telegraph-mark ahead"><span class="telegraph-rpm">15</span>D/SLOW</div>
+        <div class="telegraph-mark stop"><span class="telegraph-rpm">0</span>STOP</div>
+        <div class="telegraph-mark astern"><span class="telegraph-rpm">15</span>D/SLOW</div>
+        <div class="telegraph-mark astern"><span class="telegraph-rpm">38</span>SLOW</div>
+        <div class="telegraph-mark astern"><span class="telegraph-rpm">75</span>HALF</div>
+        <div class="telegraph-mark astern"><span class="telegraph-rpm">150</span>FULL AST</div>
+        <div class="telegraph-track"></div>
+        <div class="telegraph-handle" id="telegraphHandle"></div>
+      </div>
+      <div class="telegraph-readout">
+        <div class="telegraph-direction stop" id="telegraphDir">STOP</div>
+        <div class="telegraph-percent" id="telegraphPercent">0%</div>
+      </div>
+    </div>
+    
+    <div class="drive-controls">
+      <button class="drive-btn start" id="btnStart" onclick="startDrive()">▶ START DRIVE</button>
+      <button class="drive-btn stop" id="btnStop" onclick="stopDrive()" disabled>■ STOP DRIVE</button>
+      <button class="drive-btn estop" id="btnEstop" onclick="emergencyStop()">⚠ E-STOP</button>
+      <button class="drive-btn reset" id="btnReset" onclick="resetEstop()" style="display:none;">↻ RESET</button>
+      <label class="half-motor-toggle">
+        <input type="checkbox" id="halfMotorMode" onchange="toggleHalfMotor()">
+        <span>Half Motor Mode</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Main Overview Panel -->
+  <div class="overview-panel">
+    
+    <!-- Power Flow Diagram -->
+    <div class="power-flow-container" id="powerFlowContainer">
+      <div class="section-title">Power Flow</div>
+      <svg class="power-flow-svg" id="powerFlowSvg" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid meet">
+        <!-- Will be drawn by JS -->
+      </svg>
+      <div class="power-mode-indicator">
+        <div class="power-mode stopped active" id="modeStop">
+          <span>●</span> STOPPED
+        </div>
+        <div class="power-mode motoring" id="modeMotor">
+          <span>→</span> MOTORING
+        </div>
+        <div class="power-mode regen" id="modeRegen">
+          <span>⚡</span> DYNAMIC BRAKING
+        </div>
+      </div>
+      <div style="text-align: center; margin-top: 8px; color: var(--muted); font-size: 10px;">
+        💡 Click <strong>XFMR</strong>, <strong>RECTIFIER</strong>, <strong>DC LINK</strong>, <strong>INVERTER</strong>, <strong>MOTOR</strong>, or <strong>POD</strong> to zoom in
+      </div>
+    </div>
+
+    <!-- Auxiliary Systems -->
+    <div class="aux-systems">
+      <div class="aux-panel">
+        <div class="aux-title">Premag Transformer</div>
+        <div class="aux-row">
+          <span class="aux-label">Status</span>
+          <span class="aux-value ok" id="premagStatus"><span class="status-indicator ok"></span>READY</span>
+        </div>
+        <div class="aux-row">
+          <span class="aux-label">DC Link Precharge</span>
+          <span class="aux-value" id="premagCharge">100%</span>
+        </div>
+      </div>
+      <div class="aux-panel">
+        <div class="aux-title">Excitation Transformer</div>
+        <div class="aux-row">
+          <span class="aux-label">Status</span>
+          <span class="aux-value ok" id="excitStatus"><span class="status-indicator ok"></span>HEALTHY</span>
+        </div>
+        <div class="aux-row">
+          <span class="aux-label">Field Current</span>
+          <span class="aux-value" id="excitCurrent">0 A</span>
+        </div>
+      </div>
+      <div class="aux-panel" id="brakePanel">
+        <div class="aux-title">Braking Resistor</div>
+        <div class="aux-row">
+          <span class="aux-label">Chopper</span>
+          <span class="aux-value" id="brakeChopperStatus"><span class="status-indicator"></span>STANDBY</span>
+        </div>
+        <div class="aux-row">
+          <span class="aux-label">Resistor Temp</span>
+          <span class="aux-value" id="brakeResistorTemp">35°C</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cooling System -->
+    <div class="cooling-container">
+      <div class="section-title">Cooling System</div>
+      <div class="cooling-diagram">
+        <div class="cooling-block">
+          <div class="cooling-block-title">DI Tank</div>
+          <div class="cooling-block-value" id="diTankLevel">95%</div>
+        </div>
+        <span class="cooling-arrow">→</span>
+        <div class="cooling-block">
+          <div class="cooling-block-title">DI Pump</div>
+          <div class="cooling-block-value ok" id="diPumpStatus">RUN</div>
+        </div>
+        <span class="cooling-arrow">→</span>
+        <div class="cooling-block">
+          <div class="cooling-block-title">Cond.</div>
+          <div class="cooling-block-value ok" id="diConductivity">2.1 µS</div>
+        </div>
+        <span class="cooling-arrow">→</span>
+        <div class="cooling-block">
+          <div class="cooling-block-title">Thyristors</div>
+          <div class="cooling-block-value" id="thyristorTemp">38°C</div>
+        </div>
+        <span class="cooling-arrow">→</span>
+        <div class="cooling-block">
+          <div class="cooling-block-title">HX Out</div>
+          <div class="cooling-block-value" id="hxOutTemp">42°C</div>
+        </div>
+        <span class="cooling-arrow">→</span>
+        <div class="cooling-block">
+          <div class="cooling-block-title">LT Cool</div>
+          <div class="cooling-block-value ok" id="ltStatus">OK</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right Status Panel -->
+  <div class="status-panel">
+    
+    <div class="section-title">Motor / Pod</div>
+    <div class="motor-data">
+      <div class="motor-gauge">
+        <span class="motor-speed" id="motorSpeed">0</span>
+        <span class="motor-speed-unit">RPM</span>
+      </div>
+      <div class="motor-stats">
+        <div class="motor-stat">
+          <div class="motor-stat-value" id="motorPower">0</div>
+          <div class="motor-stat-label">kW</div>
+        </div>
+        <div class="motor-stat">
+          <div class="motor-stat-value" id="motorTorque">0</div>
+          <div class="motor-stat-label">%Torque</div>
+        </div>
+        <div class="motor-stat">
+          <div class="motor-stat-value" id="motorCurrent">0</div>
+          <div class="motor-stat-label">Amps</div>
+        </div>
+        <div class="motor-stat">
+          <div class="motor-stat-value" id="motorFreq">0</div>
+          <div class="motor-stat-label">Hz</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">DC Link</div>
+    <div class="motor-data">
+      <div class="motor-stats">
+        <div class="motor-stat">
+          <div class="motor-stat-value" id="dcVoltage" style="color: var(--accent);">0</div>
+          <div class="motor-stat-label">Volts DC</div>
+        </div>
+        <div class="motor-stat">
+          <div class="motor-stat-value" id="dcCurrent">0</div>
+          <div class="motor-stat-label">Amps DC</div>
+        </div>
+      </div>
+      <div class="trend-container">
+        <canvas id="dcTrend"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">Alarms</div>
+    <div class="alarm-panel">
+      <div class="alarm-grid">
+        <div class="alarm-tile" id="alarmDriveTrip">DRIVE TRIP</div>
+        <div class="alarm-tile" id="alarmDCOverV">DC OVERVOLT</div>
+        <div class="alarm-tile" id="alarmDCUnderV">DC UNDERVOLT</div>
+        <div class="alarm-tile" id="alarmIGCTFault">IGCT FAULT</div>
+        <div class="alarm-tile" id="alarmCoolFlow">COOL FLOW</div>
+        <div class="alarm-tile" id="alarmCondHigh">COND HIGH</div>
+        <div class="alarm-tile" id="alarmTempHigh">TEMP HIGH</div>
+        <div class="alarm-tile" id="alarmExcitFault">EXCIT FAULT</div>
+        <div class="alarm-tile" id="alarmPremagFail">PREMAG FAIL</div>
+        <div class="alarm-tile" id="alarmBearingTemp">BEARING TEMP</div>
+        <div class="alarm-tile" id="alarmSealFault">SEAL FAULT</div>
+        <div class="alarm-tile" id="alarmHalfMotor">HALF MOTOR</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Zoom Modal -->
+<div class="zoom-modal" id="zoomModal">
+  <div class="zoom-content">
+    <div class="zoom-header">
+      <h2 id="zoomTitle">Component Detail</h2>
+      <div class="zoom-controls">
+        <button class="zoom-ctrl-btn" id="zoomSlower" onclick="zoomSpeed(0.5)">⏪ 0.5x</button>
+        <button class="zoom-ctrl-btn active" id="zoomNormal" onclick="zoomSpeed(1)">▶ 1x</button>
+        <button class="zoom-ctrl-btn" id="zoomFaster" onclick="zoomSpeed(2)">⏩ 2x</button>
+        <button class="zoom-ctrl-btn" id="zoomPause" onclick="zoomTogglePause()">⏸ Pause</button>
+        <button class="zoom-ctrl-btn" id="zoomStep" onclick="zoomStep()" style="display:none;">⏭ Step</button>
+      </div>
+      <button class="zoom-pin" onclick="pinCurrentZoom()" title="Pin — keeps master free">📌 Pin</button>
+      <button class="zoom-close" onclick="closeZoom()">✕</button>
+    </div>
+    <div class="zoom-body">
+      <svg class="zoom-svg" id="zoomSvg" viewBox="0 0 900 520"></svg>
+      <div id="zoomControls" style="margin-top: 12px; padding: 12px; background: var(--bg); border-radius: 8px; display: none;"></div>
+      <div id="zoomInfo" style="margin-top: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>© 2026 Whitebridge Marine Kft | CSMART Training Resource | VSI PWM Propulsion Drive</span>
+  <div class="footer-time" id="simTime">00:00</div>
+</footer>
+
+<script>
+// === LOGO ===
+
+// === STATE ===
+const state = {
+  // Drive state
+  driveRunning: false,
+  driveTripped: false,
+  tripReason: '',
+  startupTime: 0,  // Grace period timer for startup
+  
+  // Telegraph
+  telegraphDemand: 0,   // -100 to +100 (negative = astern)
+  
+  // Motor
+  motorSpeed: 0,        // RPM (0-150)
+  motorPower: 0,        // kW
+  motorTorque: 0,       // % of rated
+  motorCurrent: 0,      // Amps
+  motorFreq: 0,         // Hz output
+  
+  // DC Link
+  dcVoltage: 0,         // Volts
+  dcCurrent: 0,         // Amps
+  dcNominal: 3100,      // Nominal DC link voltage
+  
+  // Excitation
+  fieldCurrent: 0,      // Amps
+  
+  // Cooling
+  diPumpRunning: true,
+  diConductivity: 2.1,  // µS/cm
+  diTankLevel: 95,      // %
+  thyristorTemp: 35,    // °C
+  hxOutTemp: 38,        // °C
+  ltCoolingOk: true,
+  
+  // Premag
+  premagReady: true,
+  dcPrecharge: 100,     // %
+  
+  // Mode
+  halfMotorMode: false,
+  powerMode: 'stopped', // stopped, motoring, braking
+  brakingActive: false, // Braking chopper energised
+  reversalInProgress: false, // True during entire direction-change manoeuvre
+  rotorAngle: 0,        // radians — accumulated each physics frame from actual RPM
+  resistorTemp: 35,     // °C - thermal state persists between braking events
+  resistorEnergyKJ: 0,  // kJ - cumulative energy dissipated in current session
+  
+  // Alarms
+  alarms: {
+    driveTrip: false,
+    dcOverV: false,
+    dcUnderV: false,
+    igctFault: false,
+    coolFlow: false,
+    condHigh: false,
+    tempHigh: false,
+    excitFault: false,
+    premagFail: false,
+    bearingTemp: false,
+    sealFault: false,
+    halfMotor: false
+  },
+  
+  // Simulation
+  time: 0,
+  paused: false
+};
+
+// === PARAMETERS ===
+const params = {
+  maxRPM: 150,
+  maxPower: 20000,      // kW
+  maxCurrent: 2500,     // Amps
+  maxFreq: 12,          // Hz output
+  busVoltage: 11000,    // 11kV generation
+  converterVoltage: 2300, // 2.3kV to converter
+  dcNominal: 3100,      // DC link ~1.35 x 2.3kV for 6-pulse
+  dcOvervoltage: 3600,
+  dcUndervoltage: 2800,
+  motorTimeConstant: 45, // seconds - much slower, realistic
+  maxRampRate: 3,        // RPM per second - PMS limited during normal accel
+  directionChangeRampRate: 0.8, // RPM per second when crossing zero (much slower)
+  zeroSpeedThreshold: 3, // RPM - must pass through this band when reversing
+  regenBrakeThreshold: 3400,  // DC voltage where brake resistor kicks in
+  resistorThermalMass: 45,    // kJ/°C - thermal mass of resistor bank
+  resistorCoolingRate: 0.015, // °C/sec per °C above ambient (natural convection)
+  resistorAmbient: 35,        // °C - ambient temperature in resistor cabinet
+  resistorMaxTemp: 350,       // °C - thermal trip limit
+  condLimit: 5.0,       // µS/cm
+  tempLimit: 65         // °C
+};
+
+// === TREND DATA ===
+const trendData = {
+  time: [],
+  dcVoltage: [],
+  maxPoints: 100
+};
+
+let dcTrendChart = null;
+
+// === AUDIO ===
+let audioCtx = null;
+let audioEnabled = false;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  audioEnabled = true;
+  document.getElementById('soundBtn').textContent = '🔊 Sound ON';
+  document.getElementById('soundBtn').classList.add('active');
+}
+
+function toggleSound() {
+  if (!audioCtx) {
+    initAudio();
+  } else {
+    audioEnabled = !audioEnabled;
+    document.getElementById('soundBtn').textContent = audioEnabled ? '🔊 Sound ON' : '🔇 Sound OFF';
+    document.getElementById('soundBtn').classList.toggle('active', audioEnabled);
+  }
+}
+
+// === INITIALIZATION ===
+function init() {
+  // Set logo
+  
+  initTelegraph();
+  initTrendChart();
+  updateTelegraphDisplay();  // Set telegraph to STOP position
+  drawPowerFlow();
+  
+  // Set up click handling on the SVG element
+  const svg = document.getElementById('powerFlowSvg');
+  svg.style.pointerEvents = 'all';
+  
+  svg.onclick = function(e) {
+    const rect = svg.getBoundingClientRect();
+    const viewBox = svg.viewBox.baseVal;
+    const scaleX = viewBox.width / rect.width;
+    const scaleY = viewBox.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    
+    // Components are at y=30, height=120 in viewBox coords
+    if (y < 30 || y > 150) return;
+    
+    // Check x ranges for each component
+    if (x >= 105 && x <= 195) {
+      openZoom('transformer');
+    } else if (x >= 210 && x <= 305) {
+      openZoom('rectifier');
+    } else if (x >= 320 && x <= 435) {
+      openZoom('dclink');
+    } else if (x >= 450 && x <= 550) {
+      openZoom('inverter');
+    } else if (x >= 565 && x <= 665) {
+      openZoom('motor');
+    } else if (x >= 680 && x <= 788) {
+      openZoom('pod');
+    }
+  };
+  
+  requestAnimationFrame(mainLoop);
+}
+
+function initTrendChart() {
+  const ctx = document.getElementById('dcTrend').getContext('2d');
+  dcTrendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'DC Voltage',
+        data: [],
+        borderColor: '#00d4ff',
+        backgroundColor: 'rgba(0, 212, 255, 0.1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: { display: false },
+        y: {
+          min: 2500,
+          max: 4000,
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { 
+            color: '#718096', 
+            font: { size: 9 },
+            callback: v => (v/1000).toFixed(1) + 'kV'
+          }
+        }
+      }
+    }
+  });
+}
+
+// === TELEGRAPH CONTROL ===
+function initTelegraph() {
+  const handle = document.getElementById('telegraphHandle');
+  const scale = document.querySelector('.telegraph-scale');
+  let dragging = false;
+  
+  // Allow drag from handle or anywhere on scale
+  handle.addEventListener('mousedown', (e) => {
+    dragging = true;
+    e.preventDefault();
+  });
+  
+  scale.addEventListener('mousedown', (e) => {
+    dragging = true;
+    // Immediately update position on click
+    updateFromMouse(e);
+    e.preventDefault();
+  });
+  
+  function updateFromMouse(e) {
+    const marks = scale.querySelectorAll('.telegraph-mark');
+    const scaleRect = scale.getBoundingClientRect();
+    
+    // Get the Y positions of all marks
+    const markPositions = Array.from(marks).map(mark => {
+      const markRect = mark.getBoundingClientRect();
+      return markRect.top + markRect.height / 2;
+    });
+    
+    // Find closest mark to mouse position
+    const mouseY = e.clientY;
+    let closestIndex = 0;
+    let closestDist = Math.abs(mouseY - markPositions[0]);
+    
+    for (let i = 1; i < markPositions.length; i++) {
+      const dist = Math.abs(mouseY - markPositions[i]);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestIndex = i;
+      }
+    }
+    
+    // Map index to demand value
+    const demandValues = [100, 50, 25, 10, 0, -10, -25, -50, -100];
+    state.telegraphDemand = demandValues[closestIndex];
+    
+    updateTelegraphDisplay();
+  }
+  
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    updateFromMouse(e);
+  });
+  
+  document.addEventListener('mouseup', () => {
+    dragging = false;
+  });
+}
+
+function updateTelegraphDisplay() {
+  const handle = document.getElementById('telegraphHandle');
+  const scale = document.querySelector('.telegraph-scale');
+  const marks = scale.querySelectorAll('.telegraph-mark');
+  
+  // Map demand to position index
+  const demandToIndex = {100: 0, 50: 1, 25: 2, 10: 3, 0: 4, '-10': 5, '-25': 6, '-50': 7, '-100': 8};
+  const positionIndex = demandToIndex[state.telegraphDemand] ?? 4;
+  
+  // Position handle to align with the actual mark element
+  const mark = marks[positionIndex];
+  if (mark) {
+    const scaleRect = scale.getBoundingClientRect();
+    const markRect = mark.getBoundingClientRect();
+    const handleY = markRect.top - scaleRect.top + (markRect.height / 2) - 12; // 12 = half handle height
+    handle.style.top = handleY + 'px';
+  }
+  
+  // No text on handle - just a lever
+  handle.textContent = '';
+  
+  // Calculate RPM from demand
+  const rpm = Math.round(Math.abs(state.telegraphDemand) / 100 * params.maxRPM);
+  
+  // Update direction display
+  const dirEl = document.getElementById('telegraphDir');
+  const pctEl = document.getElementById('telegraphPercent');
+  
+  if (state.telegraphDemand > 0) {
+    dirEl.textContent = 'AHEAD';
+    dirEl.className = 'telegraph-direction ahead';
+    handle.className = 'telegraph-handle ahead';
+  } else if (state.telegraphDemand < 0) {
+    dirEl.textContent = 'ASTERN';
+    dirEl.className = 'telegraph-direction astern';
+    handle.className = 'telegraph-handle astern';
+  } else {
+    dirEl.textContent = 'STOP';
+    dirEl.className = 'telegraph-direction stop';
+    handle.className = 'telegraph-handle';
+  }
+  
+  pctEl.textContent = rpm + ' RPM';
+}
+
+// === DRIVE CONTROLS ===
+function startDrive() {
+  if (state.driveTripped || !state.premagReady) return;
+  
+  state.driveRunning = true;
+  state.dcVoltage = params.dcNominal;
+  
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+}
+
+function stopDrive() {
+  state.driveRunning = false;
+  state.telegraphDemand = 0;
+  updateTelegraphDisplay();
+  
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+}
+
+function emergencyStop() {
+  state.driveTripped = true;
+  state.tripReason = 'Emergency Stop';
+  state.alarms.driveTrip = true;
+  state.driveRunning = false;
+  state.telegraphDemand = 0;
+  updateTelegraphDisplay();
+  
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('btnEstop').classList.add('engaged');
+  document.getElementById('btnEstop').disabled = true;
+  document.getElementById('btnReset').style.display = 'inline-block';
+}
+
+function resetEstop() {
+  // Only allow reset when motor has stopped
+  if (Math.abs(state.motorSpeed) > 5) {
+    state.tripReason = 'Wait for motor stop';
+    return;
+  }
+  
+  state.driveTripped = false;
+  state.tripReason = '';
+  state.alarms.driveTrip = false;
+  
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('btnEstop').classList.remove('engaged');
+  document.getElementById('btnEstop').disabled = false;
+  document.getElementById('btnReset').style.display = 'none';
+}
+
+function toggleHalfMotor() {
+  state.halfMotorMode = document.getElementById('halfMotorMode').checked;
+  state.alarms.halfMotor = state.halfMotorMode;
+}
+
+function togglePause() {
+  state.paused = !state.paused;
+  zoomPaused   = state.paused;
+  syncPauseButtons();
+}
+
+// === MAIN SIMULATION LOOP ===
+let lastTime = 0;
+
+function mainLoop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+  lastTime = timestamp;
+  
+  if (dt > 0 && !state.paused) {
+    state.time += dt;
+    
+    updatePhysics(dt);
+    updateAlarms();
+    updateDisplay();
+    updateTrends();
+    drawPowerFlow();
+  }
+  
+  requestAnimationFrame(mainLoop);
+}
+
+// === PHYSICS ===
+function updatePhysics(dt) {
+  if (!state.driveRunning || state.driveTripped) {
+    // Coast down - slow, realistic
+    state.motorSpeed *= Math.exp(-dt / 30);
+    if (Math.abs(state.motorSpeed) < 0.5) state.motorSpeed = 0;
+    state.motorPower = 0;
+    state.motorTorque = 0;
+    state.motorCurrent *= Math.exp(-dt / 5);
+    state.fieldCurrent *= Math.exp(-dt / 3);
+    state.dcVoltage *= Math.exp(-dt / 5);
+    state.powerMode = 'stopped';
+    state.reversalInProgress = false;
+    return;
+  }
+  
+  // Target speed from telegraph
+  const targetSpeed = (state.telegraphDemand / 100) * params.maxRPM;
+  const speedError = targetSpeed - state.motorSpeed;
+
+  // Direction-change logic using a reversal flag.
+  // Set when demand sign flips relative to current motion.
+  // Stays active for the entire manoeuvre (decel + zero crossing + accel in reverse)
+  // so the slow ramp rate applies symmetrically — no sudden lurch mid-manoeuvre.
+  // Cleared only when motor speed is within 5 RPM of the new target.
+  const demandFlipped = (targetSpeed < 0 && state.motorSpeed > 5) ||
+                        (targetSpeed > 0 && state.motorSpeed < -5);
+  if (demandFlipped) state.reversalInProgress = true;
+  if (state.reversalInProgress && Math.abs(speedError) < 5) state.reversalInProgress = false;
+
+  const effectiveRampRate = state.reversalInProgress
+    ? params.directionChangeRampRate
+    : params.maxRampRate;
+
+  const maxChange = effectiveRampRate * dt;
+  let speedChange = speedError * (1 - Math.exp(-dt / params.motorTimeConstant));
+
+  if (Math.abs(speedChange) > maxChange) {
+    speedChange = Math.sign(speedChange) * maxChange;
+  }
+
+  state.motorSpeed += speedChange;
+  
+  // Determine power mode
+  const accelerating = Math.sign(speedError) === Math.sign(state.motorSpeed) || Math.abs(state.motorSpeed) < 5;
+  
+  if (Math.abs(state.motorSpeed) < 2) {
+    state.powerMode = 'stopped';
+  } else if (accelerating) {
+    state.powerMode = 'motoring';
+  } else {
+    state.powerMode = 'braking';
+  }
+  
+  // Power calculation
+  const speedFraction = Math.abs(state.motorSpeed) / params.maxRPM;
+  const maxPower = state.halfMotorMode ? params.maxPower * 0.5 : params.maxPower;
+  
+  if (state.powerMode === 'motoring') {
+    state.motorPower = speedFraction * maxPower * (Math.abs(state.telegraphDemand) / 100);
+  } else if (state.powerMode === 'braking') {
+    state.motorPower = -speedFraction * maxPower * 0.3; // Braking power ~30% of motoring
+  } else {
+    state.motorPower = 0;
+  }
+  
+  // Current and torque
+  state.motorCurrent = (Math.abs(state.motorPower) / params.maxPower) * params.maxCurrent;
+  state.motorTorque = (state.motorCurrent / params.maxCurrent) * 100;
+  
+  // Output frequency
+  state.motorFreq = (Math.abs(state.motorSpeed) / params.maxRPM) * params.maxFreq;
+  
+  // Field current
+  const targetField = state.driveRunning ? 850 : 0;
+  state.fieldCurrent += (targetField - state.fieldCurrent) * 0.1 * dt;
+  
+  // DC Link voltage
+  let dcTarget = params.dcNominal;
+  
+  if (state.powerMode === 'braking') {
+    // DC voltage rises during braking - energy from motor
+    dcTarget = params.dcNominal + Math.abs(state.motorPower) / 10;
+  } else if (state.powerMode === 'motoring') {
+    // Slight sag under load
+    dcTarget = params.dcNominal - (state.motorPower / params.maxPower) * 200;
+  }
+  
+  // Braking chopper activates when DC voltage exceeds threshold
+  state.brakingActive = state.dcVoltage > params.regenBrakeThreshold;
+  
+  // If braking chopper active, clamp voltage rise (energy dissipated in resistor)
+  if (state.brakingActive && dcTarget > params.regenBrakeThreshold) {
+    dcTarget = params.regenBrakeThreshold + 50; // Chopper limits voltage rise
+  }
+
+  // Accumulate rotor angle from actual motor speed (radians per second)
+  // 1 RPM = 2π/60 rad/s, scaled ×8 for visual clarity (same factor as before)
+  state.rotorAngle += (state.motorSpeed / params.maxRPM) * 8 * dt;
+
+  // ── Braking resistor thermal model ────────────────────────────────────────
+  // Power dissipated in resistor (kW) when chopper is active
+  const resistorPowerKW = state.brakingActive
+    ? Math.abs(state.motorPower) * 0.85  // ~85% of braking power goes to resistor
+    : 0;
+
+  // Temperature rise from power dissipation: dT = P / thermalMass * dt
+  const tempRise = (resistorPowerKW / params.resistorThermalMass) * dt;
+
+  // Cooling: Newton's law — rate proportional to excess above ambient
+  const tempDrop = params.resistorCoolingRate
+    * (state.resistorTemp - params.resistorAmbient) * dt;
+
+  state.resistorTemp = Math.max(
+    params.resistorAmbient,
+    state.resistorTemp + tempRise - tempDrop
+  );
+
+  // Accumulate dissipated energy (kJ)
+  state.resistorEnergyKJ += resistorPowerKW * dt;
+
+  // Trip drive on resistor overtemperature
+  if (state.resistorTemp > params.resistorMaxTemp && !state.driveTripped) {
+    tripDrive('Braking Resistor Overtemperature');
+    state.alarms.tempHigh = true;
+  }
+  
+  state.dcVoltage += (dcTarget - state.dcVoltage) * 0.3 * dt;
+  state.dcCurrent = state.motorPower / (state.dcVoltage || 1);
+  
+  // Cooling dynamics
+  const heatLoad = state.motorCurrent / params.maxCurrent;
+  const targetTemp = 35 + heatLoad * 30;
+  state.thyristorTemp += (targetTemp - state.thyristorTemp) * 0.1 * dt;
+  state.hxOutTemp = state.thyristorTemp + 4;
+}
+
+// === ALARMS ===
+function updateAlarms() {
+  state.alarms.dcOverV = state.dcVoltage > params.dcOvervoltage;
+  state.alarms.dcUnderV = state.driveRunning && state.dcVoltage < params.dcUndervoltage;
+  state.alarms.condHigh = state.diConductivity > params.condLimit;
+  state.alarms.tempHigh = state.thyristorTemp > params.tempLimit;
+  state.alarms.coolFlow = !state.diPumpRunning;
+  
+  // Trip conditions
+  if (state.alarms.dcOverV && !state.driveTripped) {
+    tripDrive('DC Link Overvoltage');
+  }
+}
+
+function tripDrive(reason) {
+  state.driveTripped = true;
+  state.tripReason = reason;
+  state.alarms.driveTrip = true;
+  state.driveRunning = false;
+  
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('btnReset').style.display = 'inline-block';
+}
+
+// === DISPLAY ===
+function updateDisplay() {
+  // Motor data
+  document.getElementById('motorSpeed').textContent = Math.abs(state.motorSpeed).toFixed(0);
+  document.getElementById('motorPower').textContent = Math.abs(state.motorPower).toFixed(0);
+  document.getElementById('motorTorque').textContent = state.motorTorque.toFixed(0);
+  document.getElementById('motorCurrent').textContent = state.motorCurrent.toFixed(0);
+  document.getElementById('motorFreq').textContent = state.motorFreq.toFixed(1);
+  
+  // DC Link
+  document.getElementById('dcVoltage').textContent = state.dcVoltage.toFixed(0);
+  document.getElementById('dcCurrent').textContent = state.dcCurrent.toFixed(0);
+  
+  // Excitation
+  document.getElementById('excitCurrent').textContent = state.fieldCurrent.toFixed(0) + ' A';
+  
+  // Braking resistor panel
+  const brakePanel = document.getElementById('brakePanel');
+  const brakeChopperEl = document.getElementById('brakeChopperStatus');
+  const brakeResistorTempEl = document.getElementById('brakeResistorTemp');
+  const rTemp = state.resistorTemp;
+  const rTempColor = rTemp > 250 ? '#ef4444' : rTemp > 150 ? '#f59e0b' : rTemp > 80 ? '#e2e8f0' : '#718096';
+  if (state.brakingActive) {
+    brakePanel.style.borderColor = '#ef4444';
+    brakePanel.style.background = 'linear-gradient(135deg, #1a1212 0%, #0d0808 100%)';
+    brakeChopperEl.innerHTML = '<span class="status-indicator" style="background:#ef4444;box-shadow:0 0 8px #ef4444;"></span>ACTIVE';
+    brakeChopperEl.style.color = '#ef4444';
+  } else {
+    // Panel border reflects residual heat even when chopper is off
+    brakePanel.style.borderColor = rTemp > 80 ? '#f59e0b' : '';
+    brakePanel.style.background = rTemp > 80 ? 'linear-gradient(135deg, #1a1510 0%, #0d0d08 100%)' : '';
+    brakeChopperEl.innerHTML = '<span class="status-indicator"></span>STANDBY';
+    brakeChopperEl.style.color = '';
+  }
+  // Temperature always reflects real thermal state (persists after braking stops)
+  brakeResistorTempEl.textContent = rTemp.toFixed(0) + '°C';
+  brakeResistorTempEl.style.color = rTempColor;
+  
+  // Cooling
+  document.getElementById('thyristorTemp').textContent = state.thyristorTemp.toFixed(0) + '°C';
+  document.getElementById('hxOutTemp').textContent = state.hxOutTemp.toFixed(0) + '°C';
+  document.getElementById('diConductivity').textContent = state.diConductivity.toFixed(1) + ' µS';
+  
+  // Power mode indicators
+  document.getElementById('modeStop').classList.toggle('active', state.powerMode === 'stopped');
+  document.getElementById('modeMotor').classList.toggle('active', state.powerMode === 'motoring');
+  document.getElementById('modeRegen').classList.toggle('active', state.powerMode === 'braking');
+  
+  // Alarms
+  const alarmMap = {
+    driveTrip: 'alarmDriveTrip',
+    dcOverV: 'alarmDCOverV',
+    dcUnderV: 'alarmDCUnderV',
+    igctFault: 'alarmIGCTFault',
+    coolFlow: 'alarmCoolFlow',
+    condHigh: 'alarmCondHigh',
+    tempHigh: 'alarmTempHigh',
+    excitFault: 'alarmExcitFault',
+    premagFail: 'alarmPremagFail',
+    bearingTemp: 'alarmBearingTemp',
+    sealFault: 'alarmSealFault',
+    halfMotor: 'alarmHalfMotor'
+  };
+  
+  for (const [key, id] of Object.entries(alarmMap)) {
+    const el = document.getElementById(id);
+    if (state.alarms[key]) {
+      el.className = key === 'driveTrip' ? 'alarm-tile trip' : 'alarm-tile active';
+    } else {
+      el.className = 'alarm-tile';
+    }
+  }
+  
+  // Time
+  const mins = Math.floor(state.time / 60);
+  const secs = Math.floor(state.time % 60);
+  document.getElementById('simTime').textContent = 
+    mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
+}
+
+// === TRENDS ===
+function updateTrends() {
+  trendData.time.push(state.time);
+  trendData.dcVoltage.push(state.dcVoltage);
+  
+  if (trendData.time.length > trendData.maxPoints) {
+    trendData.time.shift();
+    trendData.dcVoltage.shift();
+  }
+  
+  dcTrendChart.data.labels = trendData.time.map(t => t.toFixed(0));
+  dcTrendChart.data.datasets[0].data = trendData.dcVoltage;
+  dcTrendChart.update('none');
+}
+
+// === POWER FLOW DIAGRAM ===
+function drawPowerFlow() {
+  const svg = document.getElementById('powerFlowSvg');
+  const powerFlow = state.motorPower;
+  const isMotoring = state.powerMode === 'motoring';
+  const isRegen = state.powerMode === 'braking';
+  const flowColor = isRegen ? '#f59e0b' : '#4ade80';
+  
+  // Component positions - keep square proportions
+  const y = 30;
+  const h = 120;
+  
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="blockGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:#1e2836"/>
+        <stop offset="100%" style="stop-color:#0d1117"/>
+      </linearGradient>
+    </defs>
+    
+    <!-- Connection lines (behind blocks) - dim upstream during braking -->
+    <g class="connections">
+      <line x1="90" y1="${y + h/2}" x2="105" y2="${y + h/2}" stroke="${isRegen ? '#2a3441' : '#3a4451'}" stroke-width="6"/>
+      <line x1="195" y1="${y + h/2}" x2="210" y2="${y + h/2}" stroke="${isRegen ? '#2a3441' : '#3a4451'}" stroke-width="6"/>
+      <line x1="305" y1="${y + h/2}" x2="320" y2="${y + h/2}" stroke="${isRegen ? '#2a3441' : '#3a4451'}" stroke-width="6"/>
+      <line x1="435" y1="${y + h/2}" x2="450" y2="${y + h/2}" stroke="${isRegen ? '#f59e0b' : '#3a4451'}" stroke-width="6"/>
+      <line x1="550" y1="${y + h/2}" x2="565" y2="${y + h/2}" stroke="${isRegen ? '#f59e0b' : '#3a4451'}" stroke-width="6"/>
+      <line x1="665" y1="${y + h/2}" x2="680" y2="${y + h/2}" stroke="#3a4451" stroke-width="6"/>
+    </g>
+    
+    <!-- Component Blocks with symbols -->
+    <g class="blocks">
+    
+      <!-- SWITCHBOARD - Bus bars symbol -->
+      <rect x="5" y="${y}" width="85" height="${h}" rx="6" fill="url(#blockGrad)" stroke="${state.driveRunning && !isRegen ? '#4ade80' : '#3a4451'}" stroke-width="2" opacity="${isRegen ? '0.5' : '1'}"/>
+      <text x="47" y="${y + 18}" text-anchor="middle" fill="${isRegen ? '#718096' : '#e2e8f0'}" font-size="11" font-weight="700">SWBD</text>
+      <!-- Bus bar symbol -->
+      <line x1="20" y1="${y + 40}" x2="75" y2="${y + 40}" stroke="${isRegen ? '#4a5568' : '#f59e0b'}" stroke-width="4"/>
+      <line x1="30" y1="${y + 40}" x2="30" y2="${y + 55}" stroke="${isRegen ? '#4a5568' : '#f59e0b'}" stroke-width="2"/>
+      <line x1="47" y1="${y + 40}" x2="47" y2="${y + 55}" stroke="${isRegen ? '#4a5568' : '#f59e0b'}" stroke-width="2"/>
+      <line x1="65" y1="${y + 40}" x2="65" y2="${y + 55}" stroke="${isRegen ? '#4a5568' : '#f59e0b'}" stroke-width="2"/>
+      <!-- Breaker symbol - Option D: Mimic + status indicator -->
+      ${state.driveRunning ? `
+        <!-- Closed breaker -->
+        <line x1="47" y1="${y + 55}" x2="47" y2="${y + 62}" stroke="${isRegen ? '#4a5568' : '#f59e0b'}" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="47" cy="${y + 64}" r="3" fill="${isRegen ? '#4a5568' : '#f59e0b'}"/>
+        <line x1="47" y1="${y + 64}" x2="47" y2="${y + 76}" stroke="${isRegen ? '#4a5568' : '#f59e0b'}" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="47" cy="${y + 78}" r="3" fill="none" stroke="${isRegen ? '#4a5568' : '#f59e0b'}" stroke-width="1.5"/>
+        <!-- Status box -->
+        <rect x="58" y="${y + 58}" width="18" height="18" rx="3" fill="#0d1117" stroke="#3a4451"/>
+        <circle cx="67" cy="${y + 67}" r="5" fill="#22c55e"/>
+      ` : `
+        <!-- Open breaker -->
+        <line x1="47" y1="${y + 55}" x2="47" y2="${y + 62}" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="47" cy="${y + 64}" r="3" fill="#ef4444"/>
+        <line x1="47" y1="${y + 64}" x2="58" y2="${y + 74}" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="47" cy="${y + 78}" r="3" fill="none" stroke="#ef4444" stroke-width="1.5"/>
+        <!-- Status box -->
+        <rect x="58" y="${y + 58}" width="18" height="18" rx="3" fill="#0d1117" stroke="#3a4451"/>
+        <circle cx="67" cy="${y + 67}" r="5" fill="#ef4444"/>
+      `}
+      <text x="47" y="${y + h - 8}" text-anchor="middle" fill="${isRegen ? '#4a5568' : '#00d4ff'}" font-size="10" font-weight="600">11 kV</text>
+      
+      <!-- TRANSFORMER - Coils symbol -->
+      <rect x="105" y="${y}" width="90" height="${h}" rx="6" fill="url(#blockGrad)" stroke="#3a4451" stroke-width="2" opacity="${isRegen ? '0.5' : '1'}"/>
+      <text x="150" y="${y + 18}" text-anchor="middle" fill="${isRegen ? '#718096' : '#e2e8f0'}" font-size="11" font-weight="700">XFMR</text>
+      <!-- Primary coil -->
+      <ellipse cx="130" cy="${y + 50}" rx="12" ry="18" fill="none" stroke="${isRegen ? '#4a5568' : '#f59e0b'}" stroke-width="2"/>
+      <!-- Secondary coil -->
+      <ellipse cx="170" cy="${y + 50}" rx="12" ry="18" fill="none" stroke="${isRegen ? '#4a5568' : '#00d4ff'}" stroke-width="2"/>
+      <!-- Core lines -->
+      <line x1="142" y1="${y + 32}" x2="142" y2="${y + 68}" stroke="#718096" stroke-width="2"/>
+      <line x1="158" y1="${y + 32}" x2="158" y2="${y + 68}" stroke="#718096" stroke-width="2"/>
+      <text x="150" y="${y + h - 8}" text-anchor="middle" fill="#718096" font-size="9">11→2.3kV</text>
+      
+      <!-- RECTIFIER - Diode bridge symbol - BLOCKED during braking -->
+      <rect x="210" y="${y}" width="95" height="${h}" rx="6" fill="url(#blockGrad)" stroke="${isRegen ? '#ef4444' : '#3a4451'}" stroke-width="2" opacity="${isRegen ? '0.5' : '1'}"/>
+      <text x="257" y="${y + 18}" text-anchor="middle" fill="${isRegen ? '#718096' : '#e2e8f0'}" font-size="11" font-weight="700">RECTIFIER</text>
+      <!-- Diode bridge diamond -->
+      <polygon points="257,${y+30} 285,${y+50} 257,${y+70} 229,${y+50}" fill="none" stroke="${isRegen ? '#4a5568' : '#00d4ff'}" stroke-width="2"/>
+      <!-- Diodes (triangles with bars) -->
+      <polygon points="243,${y+40} 243,${y+46} 250,${y+43}" fill="${isRegen ? '#4a5568' : '#00d4ff'}"/>
+      <line x1="250" y1="${y+40}" x2="250" y2="${y+46}" stroke="${isRegen ? '#4a5568' : '#00d4ff'}" stroke-width="2"/>
+      <polygon points="271,${y+54} 271,${y+60} 264,${y+57}" fill="${isRegen ? '#4a5568' : '#00d4ff'}"/>
+      <line x1="264" y1="${y+54}" x2="264" y2="${y+60}" stroke="${isRegen ? '#4a5568' : '#00d4ff'}" stroke-width="2"/>
+      <text x="257" y="${y + h - 8}" text-anchor="middle" fill="${isRegen ? '#ef4444' : '#718096'}" font-size="9">${isRegen ? 'BLOCKED' : 'AC → DC'}</text>
+      <!-- Clickable overlay for rectifier -->
+      <rect id="clickRectifier" x="210" y="${y}" width="95" height="${h}" fill="black" fill-opacity="0" style="cursor: pointer;" pointer-events="all"/>
+      
+      <!-- DC LINK - Capacitor symbol -->
+      <rect x="320" y="${y}" width="115" height="${h}" rx="6" fill="url(#blockGrad)" 
+            stroke="${state.dcVoltage > 3400 ? '#f59e0b' : state.dcVoltage > 2900 ? '#00d4ff' : '#3a4451'}" stroke-width="3"/>
+      <text x="377" y="${y + 18}" text-anchor="middle" fill="#00d4ff" font-size="11" font-weight="700">DC LINK</text>
+      <!-- Capacitor symbols -->
+      <line x1="352" y1="${y + 35}" x2="352" y2="${y + 55}" stroke="#f59e0b" stroke-width="3"/>
+      <line x1="358" y1="${y + 35}" x2="358" y2="${y + 55}" stroke="#f59e0b" stroke-width="3"/>
+      <line x1="377" y1="${y + 35}" x2="377" y2="${y + 55}" stroke="#f59e0b" stroke-width="3"/>
+      <line x1="383" y1="${y + 35}" x2="383" y2="${y + 55}" stroke="#f59e0b" stroke-width="3"/>
+      <line x1="402" y1="${y + 35}" x2="402" y2="${y + 55}" stroke="#f59e0b" stroke-width="3"/>
+      <line x1="408" y1="${y + 35}" x2="408" y2="${y + 55}" stroke="#f59e0b" stroke-width="3"/>
+      <text x="377" y="${y + 72}" text-anchor="middle" fill="${state.dcVoltage > 3400 ? '#f59e0b' : '#00d4ff'}" font-size="16" font-weight="700">${state.dcVoltage.toFixed(0)} V</text>
+      <text x="377" y="${y + h - 6}" text-anchor="middle" fill="#4a5568" font-size="8">CAPACITORS</text>
+      <!-- Clickable overlay for DC link -->
+      <rect id="clickDCLink" x="320" y="${y}" width="115" height="${h}" fill="black" fill-opacity="0" style="cursor: pointer;" pointer-events="all"/>
+      
+      <!-- INVERTER - IGCT/switching symbol - active during braking -->
+      <rect x="450" y="${y}" width="100" height="${h}" rx="6" fill="url(#blockGrad)" stroke="${isRegen ? '#f59e0b' : '#3a4451'}" stroke-width="2"/>
+      <text x="500" y="${y + 18}" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="700">INVERTER</text>
+      <!-- IGCT switches (simplified) -->
+      <rect x="465" y="${y + 32}" width="15" height="28" fill="none" stroke="${isRegen ? '#f59e0b' : '#00d4ff'}" stroke-width="2"/>
+      <line x1="472" y1="${y + 36}" x2="472" y2="${y + 56}" stroke="${isRegen ? '#f59e0b' : '#4ade80'}" stroke-width="2" stroke-dasharray="${state.driveRunning ? '4,2' : '0'}"/>
+      <rect x="492" y="${y + 32}" width="15" height="28" fill="none" stroke="${isRegen ? '#f59e0b' : '#00d4ff'}" stroke-width="2"/>
+      <line x1="500" y1="${y + 36}" x2="500" y2="${y + 56}" stroke="${isRegen ? '#f59e0b' : '#4ade80'}" stroke-width="2" stroke-dasharray="${state.driveRunning ? '4,2' : '0'}"/>
+      <rect x="520" y="${y + 32}" width="15" height="28" fill="none" stroke="${isRegen ? '#f59e0b' : '#00d4ff'}" stroke-width="2"/>
+      <line x1="527" y1="${y + 36}" x2="527" y2="${y + 56}" stroke="${isRegen ? '#f59e0b' : '#4ade80'}" stroke-width="2" stroke-dasharray="${state.driveRunning ? '4,2' : '0'}"/>
+      <text x="500" y="${y + 72}" text-anchor="middle" fill="${isRegen ? '#f59e0b' : '#718096'}" font-size="9">${isRegen ? 'RECTIFYING' : 'PWM'}</text>
+      <text x="500" y="${y + h - 6}" text-anchor="middle" fill="#718096" font-size="9">IGCT</text>
+      <!-- Clickable overlay for inverter -->
+      <rect id="clickInverter" x="450" y="${y}" width="100" height="${h}" fill="black" fill-opacity="0" style="cursor: pointer;" pointer-events="all"/>
+      
+      <!-- MOTOR - Circle with M - acts as generator during braking -->
+      <rect x="565" y="${y}" width="100" height="${h}" rx="6" fill="url(#blockGrad)" stroke="${isRegen ? '#f59e0b' : '#3a4451'}" stroke-width="2"/>
+      <text x="615" y="${y + 16}" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="700">${isRegen ? 'GENERATOR' : 'MOTOR'}</text>
+      <!-- Motor circle -->
+      <circle cx="615" cy="${y + 48}" r="22" fill="none" stroke="${Math.abs(state.motorSpeed) > 1 ? (isRegen ? '#f59e0b' : '#4ade80') : '#718096'}" stroke-width="3"/>
+      <text x="615" y="${y + 54}" text-anchor="middle" fill="${Math.abs(state.motorSpeed) > 1 ? (isRegen ? '#f59e0b' : '#4ade80') : '#718096'}" font-size="18" font-weight="700">${isRegen ? 'G' : 'M'}</text>
+      <text x="615" y="${y + 82}" text-anchor="middle" fill="${Math.abs(state.motorSpeed) > 1 ? (isRegen ? '#f59e0b' : '#4ade80') : '#718096'}" font-size="14" font-weight="700">${Math.abs(state.motorSpeed).toFixed(0)} RPM</text>
+      
+      <!-- POD - Propeller shape -->
+      <rect x="680" y="${y}" width="108" height="${h}" rx="6" fill="url(#blockGrad)" stroke="#3a4451" stroke-width="2"/>
+      <text x="734" y="${y + 16}" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="700">POD</text>
+      <!-- Pod body -->
+      <ellipse cx="734" cy="${y + 50}" rx="30" ry="18" fill="none" stroke="#718096" stroke-width="2"/>
+      <!-- Propeller -->
+      <g transform="translate(704, ${y + 50})">
+        ${Math.abs(state.motorSpeed) > 1 ? `
+          <g>
+            <line x1="0" y1="-12" x2="0" y2="12" stroke="#4ade80" stroke-width="3" stroke-linecap="round">
+              <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="${3 / Math.max(0.1, Math.abs(state.motorSpeed)/params.maxRPM)}s" repeatCount="indefinite"/>
+            </line>
+          </g>
+        ` : `
+          <line x1="0" y1="-10" x2="0" y2="10" stroke="#4a5568" stroke-width="2"/>
+        `}
+        <circle r="4" fill="#3a4451" stroke="#718096" stroke-width="2"/>
+      </g>
+      <text x="734" y="${y + h - 6}" text-anchor="middle" fill="#718096" font-size="9">AZIMUTH</text>
+    </g>
+    
+    <!-- Power Flow Indicator Bar (below components) -->
+    <g class="power-flow-bar" transform="translate(5, ${y + h + 25})">
+      <rect x="0" y="0" width="783" height="36" rx="6" fill="#0d1117" stroke="#2a3441"/>
+      
+      <!-- Center point marker -->
+      <line x1="391" y1="4" x2="391" y2="32" stroke="#3a4451" stroke-width="2" stroke-dasharray="4,2"/>
+      
+      ${state.driveRunning && Math.abs(powerFlow) > 100 ? `
+        <!-- Power bar -->
+        ${isMotoring ? `
+          <rect x="391" y="8" width="${Math.min(380, Math.abs(powerFlow) / params.maxPower * 380)}" height="20" rx="3" fill="${flowColor}"/>
+          <text x="400" y="23" fill="#000" font-size="11" font-weight="700">► ${Math.abs(powerFlow).toFixed(0)} kW MOTORING</text>
+        ` : `
+          <rect x="${391 - Math.min(380, Math.abs(powerFlow) / params.maxPower * 380)}" y="8" width="${Math.min(380, Math.abs(powerFlow) / params.maxPower * 380)}" height="20" rx="3" fill="${flowColor}"/>
+          <text x="${391 - Math.min(380, Math.abs(powerFlow) / params.maxPower * 380) + 5}" y="23" fill="#000" font-size="11" font-weight="700">◄ ${Math.abs(powerFlow).toFixed(0)} kW BRAKING</text>
+        `}
+      ` : `
+        <text x="391" y="23" text-anchor="middle" fill="#4a5568" font-size="11">NO POWER FLOW</text>
+      `}
+      
+      <!-- Labels -->
+      <text x="8" y="23" fill="#f59e0b" font-size="10" font-weight="600">◄ BRAKE</text>
+      <text x="775" y="23" text-anchor="end" fill="#4ade80" font-size="10" font-weight="600">MOTOR ►</text>
+    </g>
+  `;
+  
+  // Click handlers are now set up via event delegation in init()
+}
+
+// === ZOOM VIEWS ===
+let zoomInterval = null;
+let currentZoom = null;
+let zoomTimeScale = 1;
+let zoomPaused = false;
+let zoomTime = 0;
+let lastZoomTime = 0;
+
+function openZoom(component) {
+  currentZoom = component;
+  zoomTimeScale = 1;
+  zoomPaused = state.paused;  // Inherit main pause state
+  zoomTime = 0;  // Start from 0
+  lastZoomTime = performance.now();
+  
+  // Reset button states
+  document.getElementById('zoomSlower').classList.remove('active');
+  document.getElementById('zoomNormal').classList.add('active');
+  document.getElementById('zoomFaster').classList.remove('active');
+  document.getElementById('zoomPause').textContent = zoomPaused ? '▶ Play' : '⏸ Pause';
+  document.getElementById('zoomPause').classList.toggle('active', zoomPaused);
+  document.getElementById('zoomStep').style.display = zoomPaused ? 'inline-block' : 'none';
+  
+  // Show component-specific controls
+  showZoomControls(component);
+  
+  document.getElementById('zoomModal').classList.add('active');
+  document.getElementById('zoomTitle').textContent = getZoomTitle(component);
+  drawZoomView(component);
+  if (zoomInterval) clearInterval(zoomInterval);
+  zoomInterval = setInterval(() => {
+    if (!zoomPaused && !state.paused) {
+      const now = performance.now();
+      zoomTime    += (now - lastZoomTime) / 1000 * zoomTimeScale;
+      lastZoomTime = now;
+    } else {
+      lastZoomTime = performance.now();
+    }
+    drawZoomView(component);
+  }, 50);
+}
+
+function closeZoom() {
+  document.getElementById('zoomModal').classList.remove('active');
+  document.getElementById('zoomControls').style.display = 'none';
+  if (zoomInterval) clearInterval(zoomInterval);
+  currentZoom = null;
+}
+
+function zoomSpeed(scale) {
+  zoomTimeScale = scale;
+  document.getElementById('zoomSlower').classList.toggle('active', scale === 0.5);
+  document.getElementById('zoomNormal').classList.toggle('active', scale === 1);
+  document.getElementById('zoomFaster').classList.toggle('active', scale === 2);
+}
+
+function zoomTogglePause() {
+  state.paused = !state.paused;
+  zoomPaused   = state.paused;
+  lastZoomTime = performance.now();
+  syncPauseButtons();
+}
+
+function zoomStep() {
+  const stepDt = 0.05 * zoomTimeScale;
+  zoomTime += stepDt;
+  // For motor/pod: advance rotor angle
+  if (currentZoom === 'motor' || currentZoom === 'pod') {
+    state.rotorAngle += (state.motorSpeed / params.maxRPM) * 8 * stepDt;
+  }
+  if (currentZoom) drawZoomView(currentZoom);
+
+  // Step ALL pinned panels together
+  pinnedPanels.forEach(function(ps) {
+    ps.zoomTime += stepDt;
+    if (ps.component === 'motor' || ps.component === 'pod') {
+      ps.frozenRotorAngle += (state.motorSpeed / params.maxRPM) * 8 * stepDt;
+    }
+    renderPinnedPanel(ps);
+  });
+}
+
+function showZoomControls(component) {
+  const ctrl = document.getElementById('zoomControls');
+  
+  if (component === 'inverter') {
+    // Telegraph is now in the modal - no additional controls needed
+    ctrl.style.display = 'none';
+  } else if (component === 'dclink') {
+    ctrl.style.display = 'block';
+    ctrl.innerHTML = `
+      <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px;">
+          <label style="color: var(--muted); font-size: 11px; display: block; margin-bottom: 4px;">Simulate Braking Power</label>
+          <input type="range" id="zoomRegenPower" min="0" max="100" value="0" style="width: 100%;" oninput="updateZoomParam('regenPower', this.value)">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--muted);">
+            <span>0%</span>
+            <span id="zoomRegenPowerVal">0%</span>
+            <span>100%</span>
+          </div>
+        </div>
+        <div>
+          <button class="zoom-ctrl-btn" onclick="triggerBrakeChopper()" style="background: #7c2d12; border-color: #c2410c;">⚡ Trigger Brake Chopper</button>
+        </div>
+      </div>
+    `;
+  } else if (component === 'rectifier') {
+    ctrl.style.display = 'block';
+    ctrl.innerHTML = `
+      <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px;">
+          <label style="color: var(--muted); font-size: 11px; display: block; margin-bottom: 4px;">AC Input Frequency</label>
+          <input type="range" id="zoomACFreq" min="50" max="60" value="60" style="width: 100%;" oninput="updateZoomParam('acFreq', this.value)">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--muted);">
+            <span>50 Hz</span>
+            <span id="zoomACFreqVal">60 Hz</span>
+            <span>60 Hz</span>
+          </div>
+        </div>
+        <div>
+          <label style="color: var(--muted); font-size: 11px; display: block; margin-bottom: 4px;">Show Current Path</label>
+          <button class="zoom-ctrl-btn active" onclick="toggleCurrentPath()" id="currentPathBtn">Current Path: ON</button>
+        </div>
+      </div>
+    `;
+  } else if (component === 'motor') {
+    ctrl.style.display = 'block';
+    ctrl.innerHTML = `
+      <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px;">
+          <label style="color: var(--muted); font-size: 11px; display: block; margin-bottom: 4px;">Excitation Field Strength</label>
+          <input type="range" id="zoomExcitation" min="0" max="100" value="${state.excitationReady ? 100 : 0}" style="width: 100%;" oninput="updateZoomParam('excitation', this.value)">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--muted);">
+            <span>0%</span>
+            <span id="zoomExcitationVal">${state.excitationReady ? 100 : 0}%</span>
+            <span>100%</span>
+          </div>
+        </div>
+        <div>
+          <label style="color: var(--muted); font-size: 11px; display: block; margin-bottom: 4px;">Show Rotating Field</label>
+          <button class="zoom-ctrl-btn active" onclick="toggleRotatingField()" id="rotatingFieldBtn">Field: ON</button>
+        </div>
+      </div>
+    `;
+  } else if (component === 'transformer') {
+    ctrl.style.display = 'block';
+    ctrl.innerHTML = `
+      <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px;">
+          <label style="color: var(--muted); font-size: 11px; display: block; margin-bottom: 4px;">Load Level (Demo)</label>
+          <input type="range" id="zoomLoadLevel" min="0" max="100" value="50" style="width: 100%;" oninput="updateZoomParam('loadLevel', this.value)">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--muted);">
+            <span>0%</span>
+            <span id="zoomLoadLevelVal">50%</span>
+            <span>100%</span>
+          </div>
+        </div>
+        <div>
+          <label style="color: var(--muted); font-size: 11px; display: block; margin-bottom: 4px;">Show Flux Lines</label>
+          <button class="zoom-ctrl-btn active" onclick="toggleFluxLines()" id="fluxLinesBtn">Flux: ON</button>
+        </div>
+      </div>
+    `;
+  } else if (component === 'pod') {
+    ctrl.style.display = 'block';
+    ctrl.innerHTML = `
+      <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+          <label style="color: var(--muted); font-size: 11px; display: block; margin-bottom: 4px;">Azimuth Angle</label>
+          <input type="range" id="zoomAzimuth" min="-180" max="180" value="0" style="width: 100%;" oninput="updateZoomParam('azimuthAngle', this.value)">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--muted);">
+            <span>-180° (STBD)</span>
+            <span id="zoomAzimuthAngleVal">0°</span>
+            <span>+180° (PORT)</span>
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    ctrl.style.display = 'none';
+  }
+}
+
+// Zoom parameters (can be adjusted by controls)
+const zoomParams = {
+  switchFreq: 2000,
+  outFreq: 30,
+  manualIGCT: false,
+  regenPower: 0,
+  brakeActive: false,
+  acFreq: 60,
+  showCurrentPath: true,
+  excitation: 100,
+  showRotatingField: true,
+  loadLevel: 50,
+  showFluxLines: true,
+  azimuthAngle: 0,
+  pitchAngle: 15
+};
+
+function updateZoomParam(param, value) {
+  zoomParams[param] = parseFloat(value);
+  const valEl = document.getElementById('zoom' + param.charAt(0).toUpperCase() + param.slice(1) + 'Val');
+  if (valEl) {
+    if (param === 'switchFreq') valEl.textContent = value + ' Hz';
+    else if (param === 'outFreq') valEl.textContent = value + ' Hz';
+    else if (param === 'regenPower') valEl.textContent = value + '%';
+    else if (param === 'acFreq') valEl.textContent = value + ' Hz';
+    else if (param === 'excitation') valEl.textContent = value + '%';
+    else if (param === 'loadLevel') valEl.textContent = value + '%';
+    else if (param === 'azimuthAngle') valEl.textContent = value + '°';
+    else if (param === 'pitchAngle') valEl.textContent = value + '°';
+  }
+}
+
+function toggleManualIGCT() {
+  zoomParams.manualIGCT = !zoomParams.manualIGCT;
+  const btn = document.getElementById('manualIGCTBtn');
+  btn.textContent = 'Manual IGCT: ' + (zoomParams.manualIGCT ? 'ON' : 'OFF');
+  btn.classList.toggle('active', zoomParams.manualIGCT);
+}
+
+function triggerBrakeChopper() {
+  zoomParams.brakeActive = true;
+  setTimeout(() => { zoomParams.brakeActive = false; }, 2000);
+}
+
+function toggleCurrentPath() {
+  zoomParams.showCurrentPath = !zoomParams.showCurrentPath;
+  const btn = document.getElementById('currentPathBtn');
+  btn.textContent = 'Current Path: ' + (zoomParams.showCurrentPath ? 'ON' : 'OFF');
+  btn.classList.toggle('active', zoomParams.showCurrentPath);
+}
+
+function toggleRotatingField() {
+  zoomParams.showRotatingField = !zoomParams.showRotatingField;
+  const btn = document.getElementById('rotatingFieldBtn');
+  btn.textContent = 'Field: ' + (zoomParams.showRotatingField ? 'ON' : 'OFF');
+  btn.classList.toggle('active', zoomParams.showRotatingField);
+}
+
+function toggleFluxLines() {
+  zoomParams.showFluxLines = !zoomParams.showFluxLines;
+  const btn = document.getElementById('fluxLinesBtn');
+  btn.textContent = 'Flux: ' + (zoomParams.showFluxLines ? 'ON' : 'OFF');
+  btn.classList.toggle('active', zoomParams.showFluxLines);
+}
+
+function getZoomTitle(component) {
+  const titles = {
+    inverter: '⚡ VSI PWM Inverter — IGCT Switching Detail',
+    rectifier: '🔌 6-Pulse Diode Rectifier',
+    dclink: '⚡ DC Link — Capacitor Bank & Voltage',
+    motor: '🔄 Synchronous Propulsion Motor',
+    transformer: '🔀 Step-Down Transformer (11kV → 2.3kV)',
+    pod: '🚢 Azimuth Thruster Pod'
+  };
+  return titles[component] || 'Component Detail';
+}
+
+function drawZoomView(component) {
+  const svg = document.getElementById('zoomSvg');
+  const info = document.getElementById('zoomInfo');
+  
+  if (component === 'inverter') {
+    drawInverterZoom(svg, info);
+    // Update frequency display from telegraph
+    const freqDisplay = document.getElementById('zoomOutFreqDisplay');
+    if (freqDisplay) {
+      const freq = Math.abs(state.telegraphDemand) / 100 * 60;
+      freqDisplay.textContent = freq.toFixed(1) + ' Hz';
+    }
+  } else if (component === 'rectifier') {
+    drawRectifierZoom(svg, info);
+  } else if (component === 'dclink') {
+    drawDCLinkZoom(svg, info);
+  } else if (component === 'motor') {
+    drawMotorZoom(svg, info);
+  } else if (component === 'transformer') {
+    drawTransformerZoom(svg, info);
+  } else if (component === 'pod') {
+    drawPodZoom(svg, info);
+  }
+}
+
+function drawInverterZoom(svg, info) {
+  const running = state.driveRunning || zoomParams.manualIGCT;
+  const t = zoomTime; // Use controlled time
+  
+  // PWM switching simulation - use slider value
+  const switchFreq = zoomParams.switchFreq;
+  
+  // Output frequency derived from telegraph demand (not slider)
+  // This creates the direct link: Telegraph → Reference Frequency
+  const telegraphDemand = state.telegraphDemand; // -100 to +100
+  const maxFreq = params.maxFreq; // Use same maxFreq as main simulation (12 Hz)
+  const freq = Math.abs(telegraphDemand) / 100 * maxFreq;
+  
+  // Vector control parameters
+  const torqueDemand = Math.abs(state.telegraphDemand) / 100; // 0-1
+  const excitation = zoomParams.excitation / 100; // 0-1
+  
+  // Calculate Id/Iq (simplified model)
+  // Iq = torque-producing current (proportional to torque demand)
+  // Id = flux/field current (related to excitation for PM/sync motors)
+  const Iq = running ? torqueDemand * 100 : 0; // Quadrature (torque) current %
+  const Id = running ? (excitation - 0.5) * 40 : 0; // Direct (flux) current - can be +/-
+  const Imag = Math.sqrt(Id*Id + Iq*Iq); // Total current magnitude
+  const currentAngle = Math.atan2(Iq, Id) * 180 / Math.PI; // Current vector angle
+  
+  // Load angle (angle between rotor and stator field)
+  const loadAngle = running ? torqueDemand * 35 : 0; // Max ~35° for stability margin
+  
+  // Power factor calculation (simplified)
+  const pfAngle = running ? (excitation - 0.5) * 30 : 0; // Excitation affects PF
+  const powerFactor = Math.cos(pfAngle * Math.PI / 180);
+  const pfType = pfAngle > 2 ? 'leading' : pfAngle < -2 ? 'lagging' : 'unity';
+  
+  // Rotor position (encoder feedback simulation)
+  const rotorPos = running ? (t * freq * 6) % 360 : 0;
+  
+  // Generate triangle carrier wave and sine reference for PWM display
+  const pwmWidth = 380;
+  const pwmHeight = 65;
+  const numSamples = 180;
+  
+  // Calculate modulation index based on torque demand (V/f control)
+  // Torque is proportional to speed error (demand - actual)
+  const demandRpm = Math.abs(telegraphDemand) / 100 * params.maxRPM;
+  const actualRpm = Math.abs(state.motorSpeed);
+  const speedError = demandRpm - actualRpm;
+  const torquePercent = Math.max(-100, Math.min(100, speedError / params.maxRPM * 200));
+  
+  // Modulation index: base level for steady state + extra for torque demand
+  // Range 0.2 (minimum) to 1.0 (maximum)
+  const baseModulation = 0.3; // Minimum to maintain flux
+  const torqueModulation = Math.abs(torquePercent) / 100 * 0.7; // Extra for torque
+  const modulationIndex = Math.min(1.0, baseModulation + torqueModulation);
+  
+  // Reference amplitude scales with modulation index
+  const refAmplitude = (pwmHeight/2 - 5) * modulationIndex;
+  
+  let carrierPath = `M0,${pwmHeight/2}`;
+  let refPathU = `M0,${pwmHeight/2}`;
+  let refPathV = `M0,${pwmHeight/2}`;
+  let refPathW = `M0,${pwmHeight/2}`;
+  let pwmPathU = `M0,${pwmHeight}`;
+  let pwmPathV = `M0,${pwmHeight}`;
+  let pwmPathW = `M0,${pwmHeight}`;
+  
+  const carrierFreqRatio = switchFreq / (freq || 1) / 50;
+  
+  // Current time point for IGCT state calculation
+  const currentPhase = t * freq / 10;
+  const currentCarrierPhase = (t * switchFreq / 500) % 2;
+  const currentCarrierY = pwmHeight/2 - (pwmHeight/2 - 5) * (currentCarrierPhase < 1 ? currentCarrierPhase * 2 - 1 : 3 - currentCarrierPhase * 2);
+  
+  // Calculate current reference values for each phase (120° apart) - amplitude scales with modulation
+  const refU = running ? pwmHeight/2 - refAmplitude * Math.sin(currentPhase) : pwmHeight/2;
+  const refV = running ? pwmHeight/2 - refAmplitude * Math.sin(currentPhase - 2.094) : pwmHeight/2;
+  const refW = running ? pwmHeight/2 - refAmplitude * Math.sin(currentPhase - 4.189) : pwmHeight/2;
+  
+  // IGCT states driven by PWM comparison: reference < carrier = top switch ON
+  const switches = [
+    { phase: 'U', top: running && (refU < currentCarrierY), bot: running && (refU >= currentCarrierY) },
+    { phase: 'V', top: running && (refV < currentCarrierY), bot: running && (refV >= currentCarrierY) },
+    { phase: 'W', top: running && (refW < currentCarrierY), bot: running && (refW >= currentCarrierY) }
+  ];
+  
+  // Time window shown in display (in seconds) - fixed window, more cycles at higher freq
+  // With maxFreq=12Hz, use longer window to show meaningful cycles
+  const displayTimeWindow = 0.25; // 250ms window - at 12Hz shows 3 cycles
+  const cyclesVisible = Math.max(0.3, freq * displayTimeWindow); // e.g., 12Hz * 0.25s = 3 cycles
+  
+  // Carrier cycles in the display window - scale for visibility
+  // Real: 2000Hz * 0.25s = 500 cycles (too many to render)
+  // Show representative pattern instead
+  const carrierCyclesInWindow = (switchFreq / 1000) * 15; // Scaled for visual clarity
+  
+  // Generate waveform paths for display
+  for (let i = 0; i <= numSamples; i++) {
+    const x = (i / numSamples) * pwmWidth;
+    
+    // Reference: animates with time - sine wave moves through display
+    const refPhase = (i / numSamples) * cyclesVisible * Math.PI * 2 + t * 2;
+    
+    // Carrier: STATIC triangle wave (no time component) - reference moves through it
+    const carrierPhase = ((i / numSamples) * carrierCyclesInWindow * 2) % 2;
+    const carrierY = pwmHeight/2 - (pwmHeight/2 - 5) * (carrierPhase < 1 ? carrierPhase * 2 - 1 : 3 - carrierPhase * 2);
+    carrierPath += ` L${x},${carrierY}`;
+    
+    // Reference sine - amplitude scales with modulation index
+    const refYU = running ? pwmHeight/2 - refAmplitude * Math.sin(refPhase) : pwmHeight/2;
+    const refYV = running ? pwmHeight/2 - refAmplitude * Math.sin(refPhase - 2.094) : pwmHeight/2;
+    const refYW = running ? pwmHeight/2 - refAmplitude * Math.sin(refPhase - 4.189) : pwmHeight/2;
+    refPathU += ` L${x},${refYU}`;
+    refPathV += ` L${x},${refYV}`;
+    refPathW += ` L${x},${refYW}`;
+    
+    // PWM outputs - switches when reference crosses carrier
+    const pwmHighU = running && (refYU < carrierY);
+    const pwmHighV = running && (refYV < carrierY);
+    const pwmHighW = running && (refYW < carrierY);
+    if (i === 0) {
+      pwmPathU = `M0,${pwmHighU ? 5 : pwmHeight - 5}`;
+      pwmPathV = `M0,${pwmHighV ? 5 : pwmHeight - 5}`;
+      pwmPathW = `M0,${pwmHighW ? 5 : pwmHeight - 5}`;
+    } else {
+      pwmPathU += ` L${x},${pwmHighU ? 5 : pwmHeight - 5}`;
+      pwmPathV += ` L${x},${pwmHighV ? 5 : pwmHeight - 5}`;
+      pwmPathW += ` L${x},${pwmHighW ? 5 : pwmHeight - 5}`;
+    }
+  }
+  
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="zoomGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:#1e2836"/>
+        <stop offset="100%" style="stop-color:#0d1117"/>
+      </linearGradient>
+    </defs>
+    
+    <!-- DC Link Input -->
+    <rect x="10" y="25" width="55" height="260" rx="6" fill="url(#zoomGrad)" stroke="#3a4451"/>
+    <text x="37" y="48" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="700">DC+</text>
+    <line x1="37" y1="58" x2="37" y2="100" stroke="#ef4444" stroke-width="4"/>
+    <text x="37" y="160" text-anchor="middle" fill="#00d4ff" font-size="20" font-weight="700">${state.dcVoltage.toFixed(0)}V</text>
+    <line x1="37" y1="175" x2="37" y2="220" stroke="#3b82f6" stroke-width="4"/>
+    <text x="37" y="258" text-anchor="middle" fill="#3b82f6" font-size="11" font-weight="700">DC−</text>
+    
+    <!-- IGCT Bridge -->
+    <g transform="translate(75, 15)">
+      <text x="100" y="0" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="700">IGCT Inverter Bridge</text>
+      
+      ${switches.map((sw, i) => {
+        const x = i * 70 + 5;
+        const phaseColors = ['#ef4444', '#f59e0b', '#3b82f6']; // U=red, V=orange, W=blue
+        const phaseColor = phaseColors[i];
+        const onColor = phaseColor;
+        const onFill = i === 0 ? '#3b1c1c' : i === 1 ? '#3b2e1c' : '#1c2a3b';
+        return `
+          <g transform="translate(${x}, 15)">
+            <rect x="0" y="18" width="52" height="70" rx="4" fill="${sw.top ? onFill : '#1e2836'}" stroke="${sw.top ? onColor : '#3a4451'}" stroke-width="2"/>
+            <text x="26" y="45" text-anchor="middle" fill="${sw.top ? onColor : '#718096'}" font-size="11" font-weight="600">IGCT</text>
+            <text x="26" y="62" text-anchor="middle" fill="${sw.top ? onColor : '#718096'}" font-size="10">${sw.top ? 'ON' : 'OFF'}</text>
+            <circle cx="26" cy="105" r="8" fill="${running ? phaseColor : '#3a4451'}" stroke="${phaseColor}" stroke-width="2"/>
+            <text x="26" y="125" text-anchor="middle" fill="${phaseColor}" font-size="13" font-weight="700">${sw.phase}</text>
+            <rect x="0" y="135" width="52" height="70" rx="4" fill="${sw.bot ? onFill : '#1e2836'}" stroke="${sw.bot ? onColor : '#3a4451'}" stroke-width="2"/>
+            <text x="26" y="162" text-anchor="middle" fill="${sw.bot ? onColor : '#718096'}" font-size="11" font-weight="600">IGCT</text>
+            <text x="26" y="179" text-anchor="middle" fill="${sw.bot ? onColor : '#718096'}" font-size="10">${sw.bot ? 'ON' : 'OFF'}</text>
+            <line x1="26" y1="0" x2="26" y2="18" stroke="#ef4444" stroke-width="3"/>
+            <line x1="26" y1="205" x2="26" y2="225" stroke="#3b82f6" stroke-width="3"/>
+          </g>
+        `;
+      }).join('')}
+      <line x1="10" y1="15" x2="215" y2="15" stroke="#ef4444" stroke-width="3"/>
+      <line x1="10" y1="240" x2="215" y2="240" stroke="#3b82f6" stroke-width="3"/>
+    </g>
+    
+    <!-- PWM Generation -->
+    <g transform="translate(305, 10)">
+      <text x="${pwmWidth/2}" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">PWM Generation (Phase U)</text>
+      
+      <text x="5" y="28" fill="#718096" font-size="11">Carrier (grey) vs Reference (red):</text>
+      <rect x="0" y="35" width="${pwmWidth + 20}" height="${pwmHeight + 20}" rx="6" fill="#0d1117" stroke="#2a3441"/>
+      <path d="${carrierPath}" fill="none" stroke="#718096" stroke-width="1.5" transform="translate(10, 45)" opacity="0.7"/>
+      <path d="${refPathU}" fill="none" stroke="#ef4444" stroke-width="2.5" transform="translate(10, 45)"/>
+      
+      <text x="5" y="${pwmHeight + 75}" fill="#718096" font-size="11">PWM Output:</text>
+      <rect x="0" y="${pwmHeight + 82}" width="${pwmWidth + 20}" height="${pwmHeight + 15}" rx="6" fill="#0d1117" stroke="#2a3441"/>
+      <path d="${pwmPathU}" fill="none" stroke="#ef4444" stroke-width="2.5" transform="translate(10, ${pwmHeight + 90})"/>
+      
+      <!-- Visual link indicator -->
+      <text x="${pwmWidth/2}" y="${pwmHeight * 2 + 115}" text-anchor="middle" fill="#4a5568" font-size="10">Reference > Carrier → IGCT ON</text>
+    </g>
+    
+    <!-- Parameters -->
+    <g transform="translate(305, 265)">
+      <rect x="0" y="0" width="${pwmWidth + 20}" height="180" rx="6" fill="url(#zoomGrad)" stroke="#3a4451"/>
+      <text x="${pwmWidth/2}" y="22" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Inverter Status</text>
+      
+      <text x="20" y="52" fill="#718096" font-size="12">DC Link Voltage:</text>
+      <text x="${pwmWidth}" y="52" text-anchor="end" fill="#00d4ff" font-size="14" font-weight="600">${state.dcVoltage.toFixed(0)} V</text>
+      
+      <text x="20" y="78" fill="#718096" font-size="12">Switching Freq:</text>
+      <text x="${pwmWidth}" y="78" text-anchor="end" fill="#00d4ff" font-size="14" font-weight="600">${(switchFreq/1000).toFixed(1)} kHz</text>
+      
+      <text x="20" y="104" fill="#718096" font-size="12">Output Frequency:</text>
+      <text x="${pwmWidth}" y="104" text-anchor="end" fill="#f59e0b" font-size="14" font-weight="600">${running ? freq.toFixed(1) + ' Hz' : '0 Hz'}</text>
+      
+      <text x="20" y="130" fill="#718096" font-size="12">Modulation Index:</text>
+      <text x="${pwmWidth}" y="130" text-anchor="end" fill="#4ade80" font-size="14" font-weight="600">${(modulationIndex * 100).toFixed(0)}%</text>
+      
+      <text x="20" y="156" fill="#718096" font-size="12">Torque Demand:</text>
+      <text x="${pwmWidth}" y="156" text-anchor="end" fill="${torquePercent >= 0 ? '#00d4ff' : '#f59e0b'}" font-size="14" font-weight="600">${torquePercent.toFixed(0)}%</text>
+      
+      <text x="20" y="175" fill="#4a5568" font-size="9">Dead Time: 2.5 µs</text>
+    </g>
+    
+    <!-- Interactive Telegraph -->
+    <g transform="translate(720, 10)" id="inverterTelegraphGroup">
+      <text x="80" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Telegraph</text>
+      
+      <rect x="0" y="15" width="160" height="430" rx="8" fill="url(#zoomGrad)" stroke="#4ade80" stroke-opacity="0.5"/>
+      
+      <!-- Scale marks and labels -->
+      ${[
+        { label: 'FULL', rpm: 150, pct: 100, y: 45 },
+        { label: 'HALF', rpm: 75, pct: 50, y: 90 },
+        { label: 'SLOW', rpm: 38, pct: 25, y: 135 },
+        { label: 'D/SLW', rpm: 15, pct: 10, y: 180 },
+        { label: 'STOP', rpm: 0, pct: 0, y: 225 },
+        { label: 'D/SLW', rpm: 15, pct: -10, y: 270 },
+        { label: 'SLOW', rpm: 38, pct: -25, y: 315 },
+        { label: 'HALF', rpm: 75, pct: -50, y: 360 },
+        { label: 'FULL', rpm: 150, pct: -100, y: 405 }
+      ].map((mark, i) => {
+        const isAhead = mark.pct > 0;
+        const isAstern = mark.pct < 0;
+        const isStop = mark.pct === 0;
+        const color = isStop ? '#718096' : isAhead ? '#4ade80' : '#f59e0b';
+        const isActive = Math.abs(state.telegraphDemand - mark.pct) < 5;
+        return `
+          <g class="telegraph-mark-svg" data-pct="${mark.pct}" style="cursor: pointer;">
+            <line x1="15" y1="${mark.y}" x2="35" y2="${mark.y}" stroke="${color}" stroke-width="${isActive ? 3 : 1}" opacity="${isActive ? 1 : 0.5}"/>
+            <text x="40" y="${mark.y + 4}" fill="${color}" font-size="11" font-weight="${isActive ? 700 : 400}" opacity="${isActive ? 1 : 0.7}">${mark.label}</text>
+            <text x="95" y="${mark.y + 4}" fill="${color}" font-size="10" opacity="0.6">${mark.rpm}</text>
+            <text x="125" y="${mark.y + 4}" fill="#4a5568" font-size="9">RPM</text>
+          </g>
+        `;
+      }).join('')}
+      
+      <!-- Telegraph track -->
+      <rect id="invTelegraphTrack" x="15" y="40" width="20" height="370" rx="4" fill="#0d1117" stroke="#2a3441" style="cursor: ns-resize;"/>
+      
+      <!-- Telegraph handle -->
+      ${(() => {
+        // Handle y-position based on evenly spaced marks
+        const markPositions = {
+          '100': 45, '50': 90, '25': 135, '10': 180, '0': 225,
+          '-10': 270, '-25': 315, '-50': 360, '-100': 405
+        };
+        const handleY = markPositions[String(state.telegraphDemand)] || 225;
+        return `<rect id="invTelegraphHandle" x="10" y="${handleY - 8}" width="30" height="16" rx="4" 
+              fill="${state.telegraphDemand > 0 ? '#4ade80' : state.telegraphDemand < 0 ? '#f59e0b' : '#718096'}"
+              stroke="#fff" stroke-width="2" stroke-opacity="0.5"
+              style="cursor: ns-resize;"/>`;
+      })()}
+      
+      <!-- Direction and percent readout -->
+      <rect x="15" y="420" width="130" height="20" rx="4" fill="#0d1117"/>
+      <text x="80" y="434" text-anchor="middle" fill="${state.telegraphDemand > 0 ? '#4ade80' : state.telegraphDemand < 0 ? '#f59e0b' : '#718096'}" font-size="12" font-weight="700">
+        ${state.telegraphDemand > 0 ? 'AHEAD' : state.telegraphDemand < 0 ? 'ASTERN' : 'STOP'} ${Math.abs(state.telegraphDemand)}%
+      </text>
+    </g>
+    
+    <!-- Control Flow Diagram -->
+    <g transform="translate(10, 285)">
+      <text x="135" y="0" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="700">Control Flow</text>
+      
+      <!-- Telegraph box -->
+      <rect x="0" y="15" width="80" height="50" rx="6" fill="url(#zoomGrad)" stroke="#4ade80"/>
+      <text x="40" y="38" text-anchor="middle" fill="#4ade80" font-size="11" font-weight="600">TELEGRAPH</text>
+      <text x="40" y="53" text-anchor="middle" fill="#4ade80" font-size="14" font-weight="700">${Math.abs(state.telegraphDemand)}%</text>
+      
+      <!-- Arrow 1 -->
+      <line x1="85" y1="40" x2="105" y2="40" stroke="#f59e0b" stroke-width="2"/>
+      <polygon points="105,40 100,36 100,44" fill="#f59e0b"/>
+      
+      <!-- Frequency box -->
+      <rect x="110" y="15" width="80" height="50" rx="6" fill="url(#zoomGrad)" stroke="#f59e0b"/>
+      <text x="150" y="35" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="600">REF FREQ</text>
+      <text x="150" y="55" text-anchor="middle" fill="#f59e0b" font-size="16" font-weight="700">${freq.toFixed(1)} Hz</text>
+      
+      <!-- Arrow 2 -->
+      <line x1="195" y1="40" x2="215" y2="40" stroke="#00d4ff" stroke-width="2"/>
+      <polygon points="215,40 210,36 210,44" fill="#00d4ff"/>
+      
+      <!-- PWM box -->
+      <rect x="220" y="15" width="50" height="50" rx="6" fill="url(#zoomGrad)" stroke="#00d4ff"/>
+      <text x="245" y="38" text-anchor="middle" fill="#00d4ff" font-size="10" font-weight="600">PWM</text>
+      <text x="245" y="53" text-anchor="middle" fill="#00d4ff" font-size="12" font-weight="700">GEN</text>
+    </g>
+    
+    <!-- Mode indicator -->
+    <g transform="translate(10, 370)">
+      ${(() => {
+        const isBrakingMode = running && state.powerMode === 'braking';
+        const actualFreq = (Math.abs(state.motorSpeed) / params.maxRPM) * params.maxFreq;
+        const isAccelerating = running && state.powerMode === 'motoring' && actualFreq < freq - 1;
+        let modeText = running ? 'MOTORING' : 'STOPPED';
+        let modeColor = running ? '#4ade80' : '#718096';
+        if (isBrakingMode) { modeText = 'GENERATING'; modeColor = '#f59e0b'; }
+        else if (isAccelerating) { modeText = 'ACCELERATING'; modeColor = '#00d4ff'; }
+        return `
+          <rect x="0" y="0" width="270" height="35" rx="6" fill="#0d1117" stroke="${modeColor}" stroke-opacity="0.5"/>
+          <text x="135" y="23" text-anchor="middle" fill="${modeColor}" font-size="16" font-weight="700">${modeText}</text>
+        `;
+      })()}
+      
+      <rect x="0" y="45" width="270" height="35" rx="6" fill="#0d1117" stroke="#4ade80" stroke-opacity="0.3"/>
+      <text x="20" y="68" fill="#718096" font-size="12">Motor Speed:</text>
+      <text x="250" y="68" text-anchor="end" fill="#4ade80" font-size="14" font-weight="700">${Math.abs(state.motorSpeed).toFixed(0)} RPM</text>
+    </g>
+    
+    <!-- Demand vs Actual Speed Display -->
+    <g transform="translate(305, 455)">
+      ${(() => {
+        const demandRpm = Math.abs(state.telegraphDemand) / 100 * params.maxRPM;
+        const actualRpm = Math.abs(state.motorSpeed);
+        const maxRpm = params.maxRPM;
+        const barWidth = 380;
+        const demandWidth = (demandRpm / maxRpm) * barWidth;
+        const actualWidth = (actualRpm / maxRpm) * barWidth;
+        const speedError = demandRpm - actualRpm;
+        const isAccel = speedError > 1;
+        const isBraking = speedError < -1;
+        const atSpeed = !isAccel && !isBraking;
+        
+        return `
+          <text x="0" y="0" fill="#e2e8f0" font-size="12" font-weight="700">Speed Demand vs Actual</text>
+          
+          <!-- Demand bar -->
+          <text x="0" y="22" fill="#f59e0b" font-size="10">Demand:</text>
+          <rect x="60" y="12" width="${barWidth}" height="16" rx="3" fill="#0d1117" stroke="#2a3441"/>
+          <rect x="62" y="14" width="${Math.max(0, demandWidth - 4)}" height="12" rx="2" fill="#f59e0b"/>
+          <text x="${barWidth + 70}" y="23" fill="#f59e0b" font-size="11" font-weight="600">${demandRpm.toFixed(0)} RPM</text>
+          
+          <!-- Actual bar -->
+          <text x="0" y="44" fill="#4ade80" font-size="10">Actual:</text>
+          <rect x="60" y="34" width="${barWidth}" height="16" rx="3" fill="#0d1117" stroke="#2a3441"/>
+          <rect x="62" y="36" width="${Math.max(0, actualWidth - 4)}" height="12" rx="2" fill="#4ade80"/>
+          <text x="${barWidth + 70}" y="45" fill="#4ade80" font-size="11" font-weight="600">${actualRpm.toFixed(0)} RPM</text>
+          
+          <!-- Status indicator -->
+          <rect x="${barWidth + 140}" y="20" width="90" height="28" rx="4" fill="${isAccel ? '#0c4a6e' : isBraking ? '#7c2d12' : '#14532d'}" stroke="${isAccel ? '#0ea5e9' : isBraking ? '#f97316' : '#22c55e'}"/>
+          <text x="${barWidth + 185}" y="39" text-anchor="middle" fill="${isAccel ? '#0ea5e9' : isBraking ? '#f97316' : '#22c55e'}" font-size="10" font-weight="700">${isAccel ? 'ACCEL' : isBraking ? 'BRAKING' : 'AT SPEED'}</text>
+        `;
+      })()}
+    </g>
+  `;
+  
+  // Setup inverter telegraph drag handlers
+  setupInverterTelegraphDrag();
+  
+  info.innerHTML = `
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">CONTROL MODE</div>
+      <div style="color: var(--power-motor); font-size: 14px; font-weight: 600;">Field Oriented</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">TORQUE</div>
+      <div style="color: ${torquePercent >= 0 ? 'var(--accent)' : 'var(--warning)'}; font-size: 16px; font-weight: 600;">${torquePercent.toFixed(0)}%</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">TIME SCALE</div>
+      <div style="color: var(--text); font-size: 14px; font-weight: 600;">${zoomTimeScale}x ${zoomPaused ? '(PAUSED)' : ''}</div>
+    </div>
+  `;
+}
+
+// Inverter telegraph drag state
+let invTelegraphDragging = false;
+
+function setupInverterTelegraphDrag() {
+  const svg = document.getElementById('zoomSvg');
+  const track = document.getElementById('invTelegraphTrack');
+  const handle = document.getElementById('invTelegraphHandle');
+  
+  if (!track || !handle) return;
+  
+  // Define snap positions (matching the marks)
+  // Evenly spaced at 45px apart for realistic telegraph look
+  const snapMarks = [
+    { pct: 100, y: 45 },
+    { pct: 50, y: 90 },
+    { pct: 25, y: 135 },
+    { pct: 10, y: 180 },
+    { pct: 0, y: 225 },
+    { pct: -10, y: 270 },
+    { pct: -25, y: 315 },
+    { pct: -50, y: 360 },
+    { pct: -100, y: 405 }
+  ];
+  
+  const handleDrag = (e) => {
+    if (!invTelegraphDragging) return;
+    
+    e.preventDefault();
+    const svgRect = svg.getBoundingClientRect();
+    const svgY = e.clientY - svgRect.top;
+    
+    // Convert to SVG coordinates (viewBox is 0 0 900 520)
+    const scale = 520 / svgRect.height;
+    const y = svgY * scale;
+    
+    // Telegraph group is at translate(720, 10)
+    const groupOffsetY = 10;
+    const yInGroup = y - groupOffsetY;
+    
+    // Find nearest mark by y-position
+    let closest = snapMarks[0];
+    let minDist = Math.abs(yInGroup - closest.y);
+    for (const mark of snapMarks) {
+      const dist = Math.abs(yInGroup - mark.y);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = mark;
+      }
+    }
+    
+    // Update main telegraph state
+    state.telegraphDemand = closest.pct;
+    updateTelegraphDisplay();
+  };
+  
+  const startDrag = (e) => {
+    invTelegraphDragging = true;
+    handleDrag(e);
+  };
+  
+  const stopDrag = () => {
+    invTelegraphDragging = false;
+  };
+  
+  // Mouse events
+  track.addEventListener('mousedown', startDrag);
+  handle.addEventListener('mousedown', startDrag);
+  svg.addEventListener('mousemove', handleDrag);
+  svg.addEventListener('mouseup', stopDrag);
+  svg.addEventListener('mouseleave', stopDrag);
+  
+  // Touch events
+  track.addEventListener('touchstart', (e) => { startDrag(e.touches[0]); e.preventDefault(); });
+  handle.addEventListener('touchstart', (e) => { startDrag(e.touches[0]); e.preventDefault(); });
+  svg.addEventListener('touchmove', (e) => { handleDrag(e.touches[0]); e.preventDefault(); });
+  svg.addEventListener('touchend', stopDrag);
+  
+  // Click on marks to jump to position
+  const marks = svg.querySelectorAll('.telegraph-mark-svg');
+  marks.forEach(mark => {
+    mark.addEventListener('click', () => {
+      const pct = parseInt(mark.dataset.pct);
+      state.telegraphDemand = pct;
+      updateTelegraphDisplay();
+    });
+  });
+}
+
+function drawRectifierZoom(svg, info) {
+  const t = zoomTime;
+  const running = state.driveRunning;
+  const isBraking = state.powerMode === 'braking';
+  const acFreq = zoomParams.acFreq;
+  const showPath = zoomParams.showCurrentPath;
+  
+  // 6-pulse diode bridge - use AC frequency from slider
+  // During braking, diodes are reverse-biased (blocked)
+  const acSpeed = acFreq * 2 * Math.PI / 60; // Convert to animation speed
+  const diodeOn = (phase) => running && !isBraking && Math.sin(t * acSpeed + phase) > 0.5;
+  
+  // Determine which diodes are conducting for current path
+  const d1On = diodeOn(0);
+  const d3On = diodeOn(2.09);
+  const d5On = diodeOn(4.19);
+  const d2On = diodeOn(Math.PI);
+  const d4On = diodeOn(Math.PI + 2.09);
+  const d6On = diodeOn(Math.PI + 4.19);
+  
+  // Generate AC input waveforms - use full width of display (220px usable)
+  const acWaveL1 = [];
+  const acWaveL2 = [];
+  const acWaveL3 = [];
+  for (let i = 0; i <= 100; i++) {
+    const phase = (i / 100) * Math.PI * 2;
+    acWaveL1.push({ x: i * 2.2, y: 30 - 25 * Math.sin(phase + t * acSpeed) });
+    acWaveL2.push({ x: i * 2.2, y: 30 - 25 * Math.sin(phase + t * acSpeed + 2.09) });
+    acWaveL3.push({ x: i * 2.2, y: 30 - 25 * Math.sin(phase + t * acSpeed + 4.19) });
+  }
+  
+  const acPathL1 = 'M' + acWaveL1.map(p => `${p.x},${p.y}`).join(' L');
+  const acPathL2 = 'M' + acWaveL2.map(p => `${p.x},${p.y}`).join(' L');
+  const acPathL3 = 'M' + acWaveL3.map(p => `${p.x},${p.y}`).join(' L');
+  
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="zoomGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:#1e2836"/>
+        <stop offset="100%" style="stop-color:#0d1117"/>
+      </linearGradient>
+    </defs>
+    
+    ${isBraking ? `
+      <!-- BRAKING MODE WARNING -->
+      <g transform="translate(300, 10)">
+        <rect x="0" y="0" width="300" height="30" rx="4" fill="#1a1212" stroke="#ef4444" stroke-width="2"/>
+        <text x="150" y="20" text-anchor="middle" fill="#ef4444" font-size="14" font-weight="700">⚠ DIODES BLOCKED - BRAKING MODE</text>
+      </g>
+    ` : ''}
+    
+    <!-- AC Input -->
+    <g transform="translate(30, 80)" opacity="${isBraking ? '0.4' : '1'}">
+      <text x="40" y="0" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">3φ AC Input</text>
+      <text x="40" y="20" text-anchor="middle" fill="${isBraking ? '#4a5568' : '#f59e0b'}" font-size="11">2.3 kV</text>
+      
+      <line x1="40" y1="40" x2="40" y2="80" stroke="${isBraking ? '#4a5568' : '#ef4444'}" stroke-width="3"/>
+      <text x="55" y="65" fill="${isBraking ? '#4a5568' : '#ef4444'}" font-size="11" font-weight="600">L1</text>
+      
+      <line x1="40" y1="100" x2="40" y2="140" stroke="${isBraking ? '#4a5568' : '#f59e0b'}" stroke-width="3"/>
+      <text x="55" y="125" fill="${isBraking ? '#4a5568' : '#f59e0b'}" font-size="11" font-weight="600">L2</text>
+      
+      <line x1="40" y1="160" x2="40" y2="200" stroke="${isBraking ? '#4a5568' : '#3b82f6'}" stroke-width="3"/>
+      <text x="55" y="185" fill="${isBraking ? '#4a5568' : '#3b82f6'}" font-size="11" font-weight="600">L3</text>
+    </g>
+    
+    <!-- 6-Pulse Bridge -->
+    <g transform="translate(150, 50)" opacity="${isBraking ? '0.5' : '1'}">
+      <text x="150" y="0" text-anchor="middle" fill="${isBraking ? '#ef4444' : '#e2e8f0'}" font-size="14" font-weight="700">${isBraking ? '6-Pulse Diode Bridge (BLOCKED)' : '6-Pulse Diode Bridge'}</text>
+      
+      <!-- Top diodes (D1, D3, D5) - all off during braking -->
+      ${[0, 1, 2].map(i => {
+        const x = i * 100 + 30;
+        const on = diodeOn(i * 2.09);
+        const blocked = isBraking;
+        return `
+          <g transform="translate(${x}, 30)">
+            <polygon points="20,0 40,30 0,30" fill="${blocked ? '#1a1212' : (on ? '#166534' : '#1e2836')}" stroke="${blocked ? '#ef4444' : (on ? '#4ade80' : '#3a4451')}" stroke-width="2"/>
+            <line x1="0" y1="30" x2="40" y2="30" stroke="${blocked ? '#ef4444' : (on ? '#4ade80' : '#3a4451')}" stroke-width="3"/>
+            <text x="20" y="50" text-anchor="middle" fill="${blocked ? '#ef4444' : '#718096'}" font-size="10">D${i * 2 + 1}</text>
+          </g>
+        `;
+      }).join('')}
+      
+      <!-- Bottom diodes (D2, D4, D6) - all off during braking -->
+      ${[0, 1, 2].map(i => {
+        const x = i * 100 + 30;
+        const on = diodeOn(i * 2.09 + Math.PI);
+        const blocked = isBraking;
+        return `
+          <g transform="translate(${x}, 150)">
+            <polygon points="20,30 40,0 0,0" fill="${blocked ? '#1a1212' : (on ? '#166534' : '#1e2836')}" stroke="${blocked ? '#ef4444' : (on ? '#4ade80' : '#3a4451')}" stroke-width="2"/>
+            <line x1="0" y1="0" x2="40" y2="0" stroke="${blocked ? '#ef4444' : (on ? '#4ade80' : '#3a4451')}" stroke-width="3"/>
+            <text x="20" y="50" text-anchor="middle" fill="${blocked ? '#ef4444' : '#718096'}" font-size="10">D${i * 2 + 2}</text>
+          </g>
+        `;
+      }).join('')}
+      
+      <!-- DC output bus -->
+      <line x1="30" y1="20" x2="280" y2="20" stroke="${isBraking ? '#4a5568' : '#ef4444'}" stroke-width="3"/>
+      <line x1="30" y1="210" x2="280" y2="210" stroke="${isBraking ? '#4a5568' : '#3b82f6'}" stroke-width="3"/>
+    </g>
+    
+    <!-- DC Output -->
+    <g transform="translate(480, 80)">
+      <text x="60" y="0" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">DC Output</text>
+      <rect x="20" y="20" width="80" height="180" rx="4" fill="url(#zoomGrad)" stroke="${isBraking ? '#f59e0b' : '#3a4451'}"/>
+      <text x="60" y="60" text-anchor="middle" fill="${isBraking ? '#f59e0b' : '#ef4444'}" font-size="11" font-weight="600">DC+</text>
+      <text x="60" y="120" text-anchor="middle" fill="${state.dcVoltage > 3400 ? '#ef4444' : '#00d4ff'}" font-size="18" font-weight="700">${state.dcVoltage.toFixed(0)}V</text>
+      ${isBraking ? `<text x="60" y="145" text-anchor="middle" fill="#f59e0b" font-size="10">RISING</text>` : ''}
+      <text x="60" y="170" text-anchor="middle" fill="${isBraking ? '#f59e0b' : '#3b82f6'}" font-size="11" font-weight="600">DC−</text>
+    </g>
+    
+    <!-- AC Input Waveforms - dimmed during braking -->
+    <g transform="translate(620, 40)" opacity="${isBraking ? '0.4' : '1'}">
+      <text x="120" y="0" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">3-Phase AC Input (${acFreq} Hz)</text>
+      <rect x="0" y="10" width="240" height="70" rx="4" fill="#0d1117" stroke="#2a3441"/>
+      <line x1="10" y1="45" x2="230" y2="45" stroke="#2a3441" stroke-dasharray="2,2"/>
+      ${running && !isBraking ? `
+        <path d="${acPathL1}" fill="none" stroke="#ef4444" stroke-width="2" transform="translate(10, 15)"/>
+        <path d="${acPathL2}" fill="none" stroke="#f59e0b" stroke-width="2" transform="translate(10, 15)"/>
+        <path d="${acPathL3}" fill="none" stroke="#3b82f6" stroke-width="2" transform="translate(10, 15)"/>
+      ` : (isBraking ? `
+        <text x="120" y="50" text-anchor="middle" fill="#4a5568" font-size="11">NO CURRENT FLOW</text>
+      ` : '')}
+      <text x="235" y="25" fill="${isBraking ? '#4a5568' : '#ef4444'}" font-size="9">L1</text>
+      <text x="235" y="45" fill="${isBraking ? '#4a5568' : '#f59e0b'}" font-size="9">L2</text>
+      <text x="235" y="65" fill="#3b82f6" font-size="9">L3</text>
+    </g>
+    
+    <!-- DC Ripple -->
+    <g transform="translate(620, 130)">
+      <text x="120" y="0" text-anchor="middle" fill="#f59e0b" font-size="12" font-weight="600">DC Output (6-Pulse Ripple)</text>
+      <rect x="0" y="10" width="240" height="80" rx="4" fill="#0d1117" stroke="#2a3441"/>
+      
+      <!-- Scale markers -->
+      <text x="8" y="25" fill="#4a5568" font-size="8" text-anchor="end">3.3kV</text>
+      <text x="8" y="55" fill="#4a5568" font-size="8" text-anchor="end">3.1kV</text>
+      <text x="8" y="80" fill="#4a5568" font-size="8" text-anchor="end">2.9kV</text>
+      <line x1="12" y1="55" x2="230" y2="55" stroke="#2a3441" stroke-dasharray="2,2"/>
+      
+      ${running && !isBraking ? `
+        <path d="${(() => {
+          let path = 'M12,55';
+          for (let i = 0; i <= 218; i++) {
+            // 6-pulse ripple: 6 peaks per cycle, ~14% ripple - matches DC Link modal
+            const phase = (i / 218) * Math.PI * 4 + t * 8;
+            const ripple = Math.abs(Math.sin(phase * 3)) * 0.7 + 0.3;
+            const y = 55 - ripple * 25;
+            path += ` L${12 + i},${y}`;
+          }
+          return path;
+        })()}" fill="none" stroke="#f59e0b" stroke-width="2"/>
+        <text x="230" y="85" text-anchor="end" fill="#718096" font-size="8">~14% ripple @ 360Hz</text>
+      ` : isBraking ? `
+        <text x="120" y="55" text-anchor="middle" fill="#ef4444" font-size="11">BLOCKED - Braking Mode</text>
+      ` : `
+        <text x="120" y="55" text-anchor="middle" fill="#4a5568" font-size="11">Drive Stopped</text>
+      `}
+    </g>
+    
+    <!-- Current Path Indicator -->
+    ${showPath && running ? `
+    <g transform="translate(620, 220)">
+      <text x="120" y="0" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Current Conducting Path</text>
+      <rect x="0" y="10" width="240" height="50" rx="4" fill="#0d1117" stroke="#2a3441"/>
+      <text x="120" y="42" text-anchor="middle" fill="#4ade80" font-size="14" font-weight="600">
+        ${d1On ? 'D1' : d3On ? 'D3' : d5On ? 'D5' : '—'} → DC+ → Load → DC- → ${d2On ? 'D2' : d4On ? 'D4' : d6On ? 'D6' : '—'}
+      </text>
+    </g>
+    ` : ''}
+    
+    <!-- Voltage Explanation Box -->
+    <g transform="translate(620, 290)">
+      <rect x="0" y="0" width="240" height="75" rx="4" fill="#0d1117" stroke="#3a4451"/>
+      <text x="120" y="16" text-anchor="middle" fill="#00d4ff" font-size="10" font-weight="600">Why is DC voltage higher than AC input?</text>
+      <text x="10" y="32" fill="#718096" font-size="9">AC Input: 2.3 kV (RMS line-to-line)</text>
+      <text x="10" y="46" fill="#718096" font-size="9">6-pulse DC output ≈ 1.35 × AC RMS</text>
+      <text x="10" y="60" fill="#f59e0b" font-size="9" font-weight="600">2.3 kV × 1.35 = 3.1 kV DC</text>
+      <text x="10" y="72" fill="#4a5568" font-size="8">(Rectifier captures peaks, not RMS average)</text>
+    </g>
+  `;
+  
+  info.innerHTML = `
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">RECTIFIER TYPE</div>
+      <div style="color: var(--text); font-size: 14px; font-weight: 600;">6-Pulse Diode</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">TIME SCALE</div>
+      <div style="color: var(--accent); font-size: 16px; font-weight: 600;">${zoomTimeScale}x ${zoomPaused ? '(PAUSED)' : ''}</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">AC FREQUENCY</div>
+      <div style="color: var(--text); font-size: 14px; font-weight: 600;">${acFreq} Hz</div>
+    </div>
+  `;
+}
+
+function drawDCLinkZoom(svg, info) {
+  const t = zoomTime;
+  const running = state.driveRunning;
+  const regen = state.powerMode === 'braking' || zoomParams.regenPower > 0;
+  
+  // Simulate voltage based on regen slider
+  let voltage = state.dcVoltage;
+  if (zoomParams.regenPower > 0) {
+    voltage = 3100 + (zoomParams.regenPower / 100) * 500; // Up to 3600V at 100%
+  }
+  if (zoomParams.brakeActive) {
+    voltage = Math.max(3100, voltage - 200); // Brake chopper reduces voltage
+  }
+  
+  // Voltage bar height (2500-4000V range mapped to 0-200px)
+  const vMin = 2500, vMax = 4000;
+  const barHeight = Math.min(200, Math.max(0, (voltage - vMin) / (vMax - vMin) * 200));
+  const barColor = voltage > 3600 ? '#ef4444' : voltage > 3400 ? '#f59e0b' : '#00d4ff';
+  
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="zoomGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:#1e2836"/>
+        <stop offset="100%" style="stop-color:#0d1117"/>
+      </linearGradient>
+      <linearGradient id="capGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:#1e3a5f"/>
+        <stop offset="100%" style="stop-color:#0d1117"/>
+      </linearGradient>
+    </defs>
+    
+    <!-- Capacitor Bank -->
+    <g transform="translate(50, 40)">
+      <text x="100" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">DC Link Capacitor Bank</text>
+      
+      <!-- Capacitor symbols -->
+      ${[0, 1, 2, 3].map(i => {
+        const x = i * 55;
+        return `
+          <g transform="translate(${x}, 30)">
+            <rect x="0" y="0" width="45" height="200" rx="4" fill="url(#capGrad)" stroke="#3a4451" stroke-width="2"/>
+            <line x1="10" y1="60" x2="35" y2="60" stroke="#00d4ff" stroke-width="4"/>
+            <line x1="10" y1="80" x2="35" y2="80" stroke="#00d4ff" stroke-width="4"/>
+            <text x="22" y="130" text-anchor="middle" fill="#718096" font-size="9">C${i + 1}</text>
+            <text x="22" y="150" text-anchor="middle" fill="#4a5568" font-size="8">4700µF</text>
+            <!-- Charge indicator -->
+            <rect x="5" y="${200 - barHeight}" width="35" height="${barHeight}" fill="${barColor}" opacity="0.3" rx="2"/>
+          </g>
+        `;
+      }).join('')}
+      
+      <!-- Bus bars -->
+      <line x1="0" y1="250" x2="220" y2="250" stroke="#ef4444" stroke-width="4"/>
+      <text x="230" y="255" fill="#ef4444" font-size="11" font-weight="600">DC+</text>
+      <line x1="0" y1="270" x2="220" y2="270" stroke="#3b82f6" stroke-width="4"/>
+      <text x="230" y="275" fill="#3b82f6" font-size="11" font-weight="600">DC−</text>
+    </g>
+    
+    <!-- Voltage Display -->
+    <g transform="translate(320, 40)">
+      <text x="80" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">DC Link Voltage</text>
+      
+      <!-- Voltage bar -->
+      <rect x="30" y="30" width="100" height="220" rx="4" fill="#0d1117" stroke="#2a3441"/>
+      
+      <!-- Scale markings -->
+      <text x="25" y="40" text-anchor="end" fill="#718096" font-size="9">4.0kV</text>
+      <line x1="30" y1="35" x2="35" y2="35" stroke="#3a4451"/>
+      
+      <text x="25" y="90" text-anchor="end" fill="#ef4444" font-size="9">3.6kV</text>
+      <line x1="30" y1="85" x2="130" y2="85" stroke="#ef4444" stroke-dasharray="4,2"/>
+      
+      <text x="25" y="145" text-anchor="end" fill="#f59e0b" font-size="9">3.1kV</text>
+      <line x1="30" y1="140" x2="130" y2="140" stroke="#f59e0b" stroke-dasharray="4,2"/>
+      
+      <text x="25" y="200" text-anchor="end" fill="#3b82f6" font-size="9">2.8kV</text>
+      <line x1="30" y1="195" x2="130" y2="195" stroke="#3b82f6" stroke-dasharray="4,2"/>
+      
+      <text x="25" y="245" text-anchor="end" fill="#718096" font-size="9">2.5kV</text>
+      
+      <!-- Voltage bar fill -->
+      <rect x="35" y="${250 - barHeight}" width="90" height="${barHeight}" fill="${barColor}" rx="2"/>
+      
+      <!-- Current voltage -->
+      <text x="80" y="280" text-anchor="middle" fill="${barColor}" font-size="24" font-weight="700">${voltage.toFixed(0)} V</text>
+    </g>
+    
+    <!-- Regen/Brake section -->
+    <g transform="translate(520, 40)">
+      <text x="140" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Regeneration & Braking</text>
+      
+      <!-- Power flow direction -->
+      <rect x="20" y="30" width="240" height="80" rx="6" fill="url(#zoomGrad)" stroke="#3a4451"/>
+      <text x="140" y="55" text-anchor="middle" fill="#718096" font-size="11">Power Flow Direction</text>
+      ${regen ? `
+        <text x="140" y="80" text-anchor="middle" fill="#f59e0b" font-size="16" font-weight="700">◄◄◄ REGENERATING ◄◄◄</text>
+        <text x="140" y="100" text-anchor="middle" fill="#f59e0b" font-size="11">Motor → DC Link (Voltage Rising)</text>
+      ` : running ? `
+        <text x="140" y="80" text-anchor="middle" fill="#4ade80" font-size="16" font-weight="700">►►► MOTORING ►►►</text>
+        <text x="140" y="100" text-anchor="middle" fill="#4ade80" font-size="11">DC Link → Motor</text>
+      ` : `
+        <text x="140" y="80" text-anchor="middle" fill="#4a5568" font-size="14">STOPPED</text>
+      `}
+      
+      <!-- Brake resistor -->
+      <rect x="20" y="130" width="240" height="100" rx="6" fill="url(#zoomGrad)" stroke="${zoomParams.brakeActive ? '#ef4444' : '#3a4451'}"/>
+      <text x="140" y="155" text-anchor="middle" fill="#718096" font-size="11">Brake Chopper / Resistor</text>
+      
+      <!-- Resistor symbol -->
+      <path d="M60,190 L80,190 L85,175 L95,205 L105,175 L115,205 L125,175 L135,205 L140,190 L160,190" 
+            fill="none" stroke="${zoomParams.brakeActive || voltage > 3500 ? '#ef4444' : '#4a5568'}" stroke-width="3"/>
+      <text x="200" y="195" fill="${zoomParams.brakeActive || voltage > 3500 ? '#ef4444' : '#718096'}" font-size="11" font-weight="600">${zoomParams.brakeActive || voltage > 3500 ? 'ACTIVE' : 'STANDBY'}</text>
+      <text x="60" y="220" fill="#718096" font-size="9">Resistor Temp:</text>
+      <text x="200" y="220" text-anchor="end" fill="${state.resistorTemp > 250 ? '#ef4444' : state.resistorTemp > 150 ? '#f59e0b' : '#718096'}" font-size="11" font-weight="600">${state.resistorTemp.toFixed(0)}°C</text>
+      ${zoomParams.brakeActive ? `
+        <text x="140" y="235" text-anchor="middle" fill="#ef4444" font-size="10">⚡ DISSIPATING ENERGY ⚡</text>
+      ` : ''}
+      <text x="60" y="${zoomParams.brakeActive ? 250 : 235}" fill="#718096" font-size="9">Energy dissipated:</text>
+      <text x="200" y="${zoomParams.brakeActive ? 250 : 235}" text-anchor="end" fill="#718096" font-size="9">${state.resistorEnergyKJ.toFixed(1)} kJ</text>
+    </g>
+    
+    <!-- Trip levels -->
+    <g transform="translate(520, 280)">
+      <rect x="20" y="0" width="115" height="70" rx="6" fill="url(#zoomGrad)" stroke="#3a4451"/>
+      <text x="30" y="20" fill="#718096" font-size="9">OV Trip:</text>
+      <text x="125" y="20" text-anchor="end" fill="#ef4444" font-size="10" font-weight="600">3600 V</text>
+      <text x="30" y="40" fill="#718096" font-size="9">UV Trip:</text>
+      <text x="125" y="40" text-anchor="end" fill="#3b82f6" font-size="10" font-weight="600">2800 V</text>
+      <text x="30" y="60" fill="#718096" font-size="9">Nominal:</text>
+      <text x="125" y="60" text-anchor="end" fill="#4ade80" font-size="10" font-weight="600">3100 V</text>
+    </g>
+    
+    <!-- Capacitor Functions -->
+    <g transform="translate(660, 280)">
+      <rect x="0" y="0" width="130" height="70" rx="6" fill="url(#zoomGrad)" stroke="#00d4ff" stroke-opacity="0.5"/>
+      <text x="65" y="15" text-anchor="middle" fill="#00d4ff" font-size="10" font-weight="600">Capacitor Functions</text>
+      <text x="10" y="32" fill="#718096" font-size="9">• Voltage smoothing</text>
+      <text x="10" y="46" fill="#718096" font-size="9">• PF correction</text>
+      <text x="10" y="60" fill="#718096" font-size="9">• THD filtering</text>
+    </g>
+    
+    <!-- Waveform Comparison Section -->
+    <g transform="translate(50, 365)">
+      <text x="380" y="0" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700">Capacitor Filtering Effect</text>
+      
+      <!-- Rectifier Output (6-pulse ripple) -->
+      <g transform="translate(0, 15)">
+        <rect x="0" y="0" width="370" height="80" rx="4" fill="#0d1117" stroke="#3a4451"/>
+        <text x="185" y="15" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="600">Rectifier Output (6-Pulse Ripple)</text>
+        
+        <!-- Zero line and scale -->
+        <line x1="10" y1="55" x2="360" y2="55" stroke="#2a3441" stroke-dasharray="2,2"/>
+        <text x="5" y="30" fill="#4a5568" font-size="8" text-anchor="end">3.3kV</text>
+        <text x="5" y="58" fill="#4a5568" font-size="8" text-anchor="end">3.1kV</text>
+        <text x="5" y="75" fill="#4a5568" font-size="8" text-anchor="end">2.9kV</text>
+        
+        <!-- 6-pulse waveform - animated -->
+        ${running ? `
+          <path d="${(() => {
+            let path = 'M10,55';
+            for (let i = 0; i <= 350; i++) {
+              // 6-pulse ripple: 6 peaks per cycle, ~14% ripple
+              const phase = (i / 350) * Math.PI * 4 + t * 8;
+              const ripple = Math.abs(Math.sin(phase * 3)) * 0.7 + 0.3;
+              const y = 55 - ripple * 25;
+              path += ` L${10 + i},${y}`;
+            }
+            return path;
+          })()}" fill="none" stroke="#f59e0b" stroke-width="2"/>
+        ` : `
+          <text x="185" y="50" text-anchor="middle" fill="#4a5568" font-size="11">Drive Stopped</text>
+        `}
+        
+        <text x="360" y="75" text-anchor="end" fill="#718096" font-size="8">~14% ripple @ 360Hz</text>
+      </g>
+      
+      <!-- Arrow showing filtering -->
+      <g transform="translate(380, 35)">
+        <rect x="0" y="10" width="40" height="40" rx="4" fill="url(#zoomGrad)" stroke="#00d4ff" stroke-opacity="0.5"/>
+        <text x="20" y="28" text-anchor="middle" fill="#00d4ff" font-size="10">C</text>
+        <text x="20" y="42" text-anchor="middle" fill="#00d4ff" font-size="14">→</text>
+      </g>
+      
+      <!-- DC Link Output (filtered) -->
+      <g transform="translate(430, 15)">
+        <rect x="0" y="0" width="370" height="80" rx="4" fill="#0d1117" stroke="#3a4451"/>
+        <text x="185" y="15" text-anchor="middle" fill="#4ade80" font-size="10" font-weight="600">DC Link Output (Filtered)</text>
+        
+        <!-- Zero line and scale -->
+        <line x1="10" y1="55" x2="360" y2="55" stroke="#2a3441" stroke-dasharray="2,2"/>
+        <text x="5" y="30" fill="#4a5568" font-size="8" text-anchor="end">3.3kV</text>
+        <text x="5" y="58" fill="#4a5568" font-size="8" text-anchor="end">3.1kV</text>
+        <text x="5" y="75" fill="#4a5568" font-size="8" text-anchor="end">2.9kV</text>
+        
+        <!-- Smooth DC with minimal ripple - animated -->
+        ${running ? `
+          <path d="${(() => {
+            let path = 'M10,45';
+            for (let i = 0; i <= 350; i++) {
+              // Filtered: ~1-2% residual ripple
+              const phase = (i / 350) * Math.PI * 4 + t * 8;
+              const ripple = Math.sin(phase * 3) * 0.15;
+              const y = 45 - ripple * 8;
+              path += ` L${10 + i},${y}`;
+            }
+            return path;
+          })()}" fill="none" stroke="#4ade80" stroke-width="2"/>
+        ` : `
+          <text x="185" y="50" text-anchor="middle" fill="#4a5568" font-size="11">Drive Stopped</text>
+        `}
+        
+        <text x="360" y="75" text-anchor="end" fill="#718096" font-size="8">~1% ripple (smoothed)</text>
+      </g>
+    </g>
+  `;
+  
+  info.innerHTML = `
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">CAPACITANCE</div>
+      <div style="color: var(--text); font-size: 14px; font-weight: 600;">18,800 µF</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">STORED ENERGY</div>
+      <div style="color: var(--accent); font-size: 14px; font-weight: 600;">${((0.5 * 0.0188 * voltage * voltage) / 1000).toFixed(1)} kJ</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">SIMULATED VOLTAGE</div>
+      <div style="color: ${voltage > 3500 ? 'var(--alarm)' : voltage > 3400 ? 'var(--warning)' : 'var(--accent)'}; font-size: 16px; font-weight: 600;">${voltage.toFixed(0)} V</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">BRAKE CHOPPER</div>
+      <div style="color: ${zoomParams.brakeActive ? 'var(--alarm)' : 'var(--muted)'}; font-size: 14px; font-weight: 600;">${zoomParams.brakeActive ? 'ACTIVE' : 'STANDBY'}</div>
+    </div>
+  `;
+}
+
+function drawMotorZoom(svg, info) {
+  const t = zoomTime;
+  const running = state.driveRunning;
+  const rpm = state.motorSpeed; // Keep sign for direction
+  const absRpm = Math.abs(rpm);
+  const excitation = zoomParams.excitation;
+  const showField = zoomParams.showRotatingField;
+  const isBraking = state.powerMode === 'braking';
+  
+  // Calculate torque for use throughout modal (including PF calculation)
+  const demandRpmGlobal = Math.abs(state.telegraphDemand) / 100 * params.maxRPM;
+  const speedErrorGlobal = demandRpmGlobal - absRpm;
+  const torqueLimit = state.halfMotorMode ? 50 : 100;
+  const rawTorqueGlobal = Math.max(-100, Math.min(100, speedErrorGlobal / params.maxRPM * 200));
+  const torquePercentGlobal = Math.max(-torqueLimit, Math.min(torqueLimit, rawTorqueGlobal));
+  const absTorqueGlobal = Math.abs(torquePercentGlobal);
+  
+  // Use the physics-accurate accumulated rotor angle from state.
+  // This is driven by actual state.motorSpeed each frame — so the visual
+  // always matches the indicated speed exactly, including during ramps and reversals.
+  const baseFieldAngle = state.rotorAngle;
+
+  // In half motor mode, add cogging/stepping effect
+  const coggingAmount = state.halfMotorMode ? 0.15 : 0;
+  const coggingFrequency = 3;
+  const coggingOffset = Math.sin(baseFieldAngle * coggingFrequency) * coggingAmount;
+  const fieldAngle = baseFieldAngle + coggingOffset;
+  
+  const shouldRotate = absRpm > 1 && excitation > 10;
+  const direction = rpm >= 0 ? 'AHEAD' : 'ASTERN';
+  
+  // Stator winding phases - synchronized with rotor for synchronous motor
+  const phaseAngle = fieldAngle * 2; // Electrical angle = mechanical angle × pole pairs
+  const phaseU = Math.sin(phaseAngle);
+  const phaseV = Math.sin(phaseAngle + 2.094); // 120° phase shift
+  const phaseW = Math.sin(phaseAngle + 4.189); // 240° phase shift
+  
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="zoomGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:#1e2836"/>
+        <stop offset="100%" style="stop-color:#0d1117"/>
+      </linearGradient>
+      <radialGradient id="rotorGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" style="stop-color:#2a3f5f"/>
+        <stop offset="100%" style="stop-color:#1a2332"/>
+      </radialGradient>
+    </defs>
+    
+    <!-- Motor Cross-Section -->
+    <g transform="translate(50, 30)">
+      <text x="150" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Synchronous Motor Cross-Section</text>
+      
+      <!-- Stator outer ring -->
+      <circle cx="150" cy="170" r="130" fill="none" stroke="#4a5568" stroke-width="20"/>
+      <circle cx="150" cy="170" r="140" fill="none" stroke="#2a3441" stroke-width="2"/>
+      <circle cx="150" cy="170" r="120" fill="none" stroke="#2a3441" stroke-width="2"/>
+      
+      <!-- Stator windings (6 slots for 3-phase, dual wound) -->
+      ${[0, 60, 120, 180, 240, 300].map((angle, i) => {
+        const rad = angle * Math.PI / 180;
+        const x = 150 + 125 * Math.cos(rad);
+        const y = 170 + 125 * Math.sin(rad);
+        const phase = i % 3;
+        const phaseColors = ['#ef4444', '#f59e0b', '#3b82f6'];
+        const phaseNames = ['U', 'V', 'W'];
+        const phaseValues = [phaseU, phaseV, phaseW];
+        // In half motor mode, dim alternate windings (winding set B: indices 1, 3, 5)
+        const isHalfMotorDimmed = state.halfMotorMode && (i % 2 === 1);
+        const brightness = isHalfMotorDimmed ? 0.15 : (shouldRotate ? 0.3 + 0.7 * Math.abs(phaseValues[phase]) : 0.3);
+        const windingSet = i % 2 === 0 ? '1' : '2'; // Dual wound: set 1 and set 2
+        return `
+          <circle cx="${x}" cy="${y}" r="12" fill="${isHalfMotorDimmed ? '#4a5568' : phaseColors[phase]}" opacity="${brightness}"/>
+          <text x="${x}" y="${y + 4}" text-anchor="middle" fill="${isHalfMotorDimmed ? '#718096' : '#fff'}" font-size="9" font-weight="600">${phaseNames[phase]}${windingSet}</text>
+        `;
+      }).join('')}
+      
+      <!-- Air gap -->
+      <circle cx="150" cy="170" r="90" fill="none" stroke="#1a2332" stroke-width="8"/>
+      
+      <!-- Rotor -->
+      <circle cx="150" cy="170" r="80" fill="url(#rotorGrad)" stroke="#3a4451" stroke-width="2"/>
+      
+      <!-- Rotor poles (salient pole synchronous) -->
+      <g transform="rotate(${fieldAngle * 180 / Math.PI}, 150, 170)">
+        <!-- Pole shoes - trapezoid shapes for salient poles -->
+        ${[0, 90, 180, 270].map((angle, i) => {
+          const polarity = i % 2 === 0 ? 'N' : 'S';
+          const color = i % 2 === 0 ? '#ef4444' : '#3b82f6';
+          const excBrightness = excitation / 100;
+          return `
+            <g transform="rotate(${angle}, 150, 170)">
+              <!-- Pole body - wider at air gap (top), narrower at rotor body -->
+              <path d="M135,95 L165,95 L160,115 L140,115 Z" 
+                    fill="${excitation > 0 ? color : '#4a5568'}" 
+                    opacity="${Math.max(0.3, excBrightness)}"
+                    stroke="${excitation > 50 ? color : '#3a4451'}" stroke-width="2"/>
+              <!-- Pole face (curved to follow air gap) -->
+              <path d="M133,95 Q150,85 167,95" 
+                    fill="none" stroke="${excitation > 50 ? color : '#4a5568'}" stroke-width="3"/>
+              <!-- Pole label -->
+              <text x="150" y="108" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">
+                ${excitation > 30 ? polarity : ''}
+              </text>
+            </g>
+          `;
+        }).join('')}
+        
+        <!-- Rotor shaft -->
+        <circle cx="150" cy="170" r="30" fill="#1a2332" stroke="#3a4451" stroke-width="2"/>
+        
+        <!-- Shaft keyway (reference marker to track rotation) -->
+        <rect x="147" y="140" width="6" height="15" fill="#f59e0b" rx="1"/>
+        <circle cx="150" cy="170" r="10" fill="#4a5568"/>
+      </g>
+      
+      <!-- Rotating magnetic field indicator -->
+      ${showField && shouldRotate ? `
+        <g transform="rotate(${fieldAngle * 180 / Math.PI}, 150, 170)">
+          <line x1="150" y1="170" x2="150" y2="45" stroke="#4ade80" stroke-width="3" opacity="0.8"/>
+          <polygon points="150,40 144,52 156,52" fill="#4ade80" opacity="0.8"/>
+          <text x="150" y="32" text-anchor="middle" fill="#4ade80" font-size="11" font-weight="600">B</text>
+        </g>
+      ` : ''}
+      
+      <!-- Static reference line -->
+      <line x1="150" y1="320" x2="150" y2="305" stroke="#718096" stroke-width="2"/>
+      <text x="150" y="335" text-anchor="middle" fill="#718096" font-size="9">REF</text>
+    </g>
+    
+    <!-- Excitation System -->
+    <g transform="translate(380, 30)">
+      <text x="120" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Excitation System</text>
+      
+      <rect x="0" y="20" width="240" height="130" rx="6" fill="url(#zoomGrad)" stroke="#3a4451"/>
+      
+      <!-- Exciter diagram -->
+      <text x="20" y="50" fill="#718096" font-size="11">DC Exciter</text>
+      <rect x="120" y="35" width="60" height="30" rx="4" fill="${excitation > 0 ? '#166534' : '#1e2836'}" stroke="${excitation > 0 ? '#4ade80' : '#3a4451'}"/>
+      <text x="150" y="55" text-anchor="middle" fill="${excitation > 0 ? '#4ade80' : '#718096'}" font-size="10">EXC</text>
+      
+      <text x="20" y="90" fill="#718096" font-size="11">Field Current</text>
+      <rect x="120" y="75" width="100" height="20" rx="3" fill="#0d1117" stroke="#3a4451"/>
+      <rect x="122" y="77" width="${excitation * 0.96}" height="16" rx="2" fill="${excitation > 80 ? '#4ade80' : excitation > 50 ? '#f59e0b' : '#ef4444'}"/>
+      
+      <text x="20" y="130" fill="#718096" font-size="11">Field Voltage</text>
+      <text x="150" y="130" text-anchor="middle" fill="#00d4ff" font-size="14" font-weight="600">${(excitation * 1.5).toFixed(0)} V</text>
+    </g>
+    
+    <!-- Speed/Torque Display -->
+    <g transform="translate(380, 180)">
+      ${(() => {
+        // Calculate torque based on speed error (demand - actual)
+        const demandRpm = Math.abs(state.telegraphDemand) / 100 * params.maxRPM;
+        const actualRpm = absRpm;
+        const speedError = demandRpm - actualRpm; // Positive = accelerating, Negative = braking
+        
+        // Torque proportional to speed error, capped at ±100% (or ±50% in half motor mode)
+        const torqueLimit = state.halfMotorMode ? 50 : 100;
+        const rawTorque = Math.max(-100, Math.min(100, speedError / params.maxRPM * 200));
+        const torquePercent = Math.max(-torqueLimit, Math.min(torqueLimit, rawTorque));
+        const absTorque = Math.abs(torquePercent);
+        const torqueLimited = state.halfMotorMode && Math.abs(rawTorque) > torqueLimit;
+        const torqueDirection = torquePercent >= 0 ? 'MOTORING' : 'BRAKING';
+        
+        // Current proportional to torque magnitude, also limited in half motor mode
+        const maxCurrent = state.halfMotorMode ? 1250 : 2500;
+        const current = running ? Math.min(absTorque * 25, maxCurrent).toFixed(0) : 0;
+        
+        return `
+      <text x="120" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Operating Point</text>
+      
+      ${state.halfMotorMode ? `
+        <rect x="0" y="20" width="240" height="220" rx="6" fill="url(#zoomGrad)" stroke="#f59e0b" stroke-width="2"/>
+        <rect x="60" y="24" width="120" height="16" rx="3" fill="#f59e0b"/>
+        <text x="120" y="35" text-anchor="middle" fill="#000" font-size="10" font-weight="700">HALF MOTOR MODE</text>
+      ` : `
+        <rect x="0" y="20" width="240" height="220" rx="6" fill="url(#zoomGrad)" stroke="${isBraking ? '#f59e0b' : '#3a4451'}"/>
+      `}
+      
+      <text x="20" y="${state.halfMotorMode ? 58 : 50}" fill="#718096" font-size="11">Speed Demand</text>
+      <text x="200" y="${state.halfMotorMode ? 58 : 50}" text-anchor="end" fill="#00d4ff" font-size="14" font-weight="600">${demandRpm.toFixed(0)} RPM</text>
+      
+      <text x="20" y="${state.halfMotorMode ? 83 : 75}" fill="#718096" font-size="11">Speed Actual</text>
+      <text x="200" y="${state.halfMotorMode ? 83 : 75}" text-anchor="end" fill="${isBraking ? '#f59e0b' : '#4ade80'}" font-size="16" font-weight="700">${actualRpm.toFixed(0)} RPM</text>
+      
+      <text x="20" y="${state.halfMotorMode ? 108 : 100}" fill="#718096" font-size="11">Direction</text>
+      <text x="200" y="${state.halfMotorMode ? 108 : 100}" text-anchor="end" fill="${absRpm > 1 ? (rpm >= 0 ? '#4ade80' : '#f59e0b') : '#718096'}" font-size="12" font-weight="600">${absRpm > 1 ? direction : 'STOPPED'}</text>
+      
+      <!-- Torque section -->
+      <line x1="20" y1="${state.halfMotorMode ? 120 : 115}" x2="220" y2="${state.halfMotorMode ? 120 : 115}" stroke="#3a4451" stroke-dasharray="2,2"/>
+      
+      <text x="20" y="${state.halfMotorMode ? 140 : 135}" fill="#718096" font-size="11">Torque</text>
+      <text x="200" y="${state.halfMotorMode ? 140 : 135}" text-anchor="end" fill="${torqueLimited ? '#ef4444' : (torquePercent >= 0 ? '#00d4ff' : '#f59e0b')}" font-size="14" font-weight="600">${torquePercent.toFixed(0)}%${torqueLimited ? ' LIM' : ''}</text>
+      <text x="205" y="${state.halfMotorMode ? 140 : 135}" fill="${torquePercent >= 0 ? '#00d4ff' : '#f59e0b'}" font-size="9">${torquePercent >= 0 ? '→' : '←'}</text>
+      
+      <text x="20" y="${state.halfMotorMode ? 165 : 160}" fill="#718096" font-size="11">Stator Current</text>
+      <text x="200" y="${state.halfMotorMode ? 165 : 160}" text-anchor="end" fill="${torqueLimited ? '#ef4444' : '#f59e0b'}" font-size="14" font-weight="600">${current} A${torqueLimited ? ' MAX' : ''}</text>
+      
+      <!-- Torque bar - centre zero, left = braking, right = motoring -->
+      <rect x="20" y="${state.halfMotorMode ? 175 : 170}" width="200" height="14" rx="2" fill="#0d1117" stroke="#3a4451"/>
+      <line x1="120" y1="${state.halfMotorMode ? 175 : 170}" x2="120" y2="${state.halfMotorMode ? 189 : 184}" stroke="#718096" stroke-width="1"/>
+      ${state.halfMotorMode ? `
+        <!-- 50% limit markers -->
+        <line x1="70" y1="${state.halfMotorMode ? 175 : 170}" x2="70" y2="${state.halfMotorMode ? 189 : 184}" stroke="#ef4444" stroke-width="1" stroke-dasharray="2,2"/>
+        <line x1="170" y1="${state.halfMotorMode ? 175 : 170}" x2="170" y2="${state.halfMotorMode ? 189 : 184}" stroke="#ef4444" stroke-width="1" stroke-dasharray="2,2"/>
+      ` : ''}
+      ${torquePercent >= 0 ? `
+        <rect x="120" y="${state.halfMotorMode ? 177 : 172}" width="${absTorque * 0.98}" height="10" rx="1" fill="${torqueLimited ? '#ef4444' : '#00d4ff'}"/>
+      ` : `
+        <rect x="${120 - absTorque * 0.98}" y="${state.halfMotorMode ? 177 : 172}" width="${absTorque * 0.98}" height="10" rx="1" fill="${torqueLimited ? '#ef4444' : '#f59e0b'}"/>
+      `}
+      <text x="25" y="${state.halfMotorMode ? 201 : 196}" fill="#f59e0b" font-size="8">BRAKE</text>
+      <text x="195" y="${state.halfMotorMode ? 201 : 196}" text-anchor="end" fill="#00d4ff" font-size="8">MOTOR</text>
+      
+      <text x="120" y="${state.halfMotorMode ? 215 : 210}" text-anchor="middle" fill="${state.halfMotorMode ? '#ef4444' : '#4a5568'}" font-size="9">${state.halfMotorMode ? 'TORQUE LIMITED TO 50%' : 'Torque = f(Demand − Actual)'}</text>
+      
+      <text x="20" y="225" fill="#718096" font-size="11">Power Factor</text>
+      <text x="200" y="225" text-anchor="end" fill="#f59e0b" font-size="12">${running ? (0.85 + excitation/1000).toFixed(2) + ' lag' : '—'}</text>
+        `;
+      })()}
+    </g>
+    
+    <!-- Key info -->
+    <g transform="translate(650, 30)">
+      <text x="100" y="0" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Motor Data</text>
+      <rect x="0" y="15" width="200" height="150" rx="6" fill="url(#zoomGrad)" stroke="#3a4451"/>
+      
+      <text x="15" y="38" fill="#718096" font-size="10">Type:</text>
+      <text x="185" y="38" text-anchor="end" fill="#e2e8f0" font-size="10">Synchronous</text>
+      
+      <text x="15" y="56" fill="#718096" font-size="10">Poles:</text>
+      <text x="185" y="56" text-anchor="end" fill="#e2e8f0" font-size="10">4</text>
+      
+      <text x="15" y="74" fill="#718096" font-size="10">Rated Power:</text>
+      <text x="185" y="74" text-anchor="end" fill="#e2e8f0" font-size="10">${(params.maxPower/1000).toFixed(1)} MW</text>
+      
+      <text x="15" y="92" fill="#718096" font-size="10">Rated Voltage:</text>
+      <text x="185" y="92" text-anchor="end" fill="#e2e8f0" font-size="10">2.3 kV</text>
+      
+      <text x="15" y="110" fill="#718096" font-size="10">Rated Speed:</text>
+      <text x="185" y="110" text-anchor="end" fill="#e2e8f0" font-size="10">${params.maxRPM} RPM</text>
+      
+      <text x="15" y="128" fill="#718096" font-size="10">Cooling:</text>
+      <text x="185" y="128" text-anchor="end" fill="#e2e8f0" font-size="10">Water Jacket</text>
+      
+      <text x="15" y="146" fill="#718096" font-size="10">Insulation:</text>
+      <text x="185" y="146" text-anchor="end" fill="#e2e8f0" font-size="10">Class F</text>
+    </g>
+    
+    <!-- Power Factor & Excitation Control -->
+    <g transform="translate(650, 210)">
+      ${(() => {
+        // Unity PF point shifts with load - need more excitation at higher torque
+        // At no load: ~40% excitation for unity
+        // At full load: ~70% excitation for unity
+        const unityExcitation = 40 + (absTorqueGlobal * 0.3);
+        
+        // Calculate PF based on excitation relative to load-dependent unity point
+        const pfAngle = running ? (excitation - unityExcitation) * 0.6 : 0;
+        const powerFactor = Math.cos(pfAngle * Math.PI / 180);
+        const pfType = pfAngle > 2 ? 'lead' : pfAngle < -2 ? 'lag' : 'unity';
+        
+        return `
+      <text x="100" y="0" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Power Factor Control</text>
+      <rect x="0" y="15" width="200" height="180" rx="6" fill="url(#zoomGrad)" stroke="#3a4451"/>
+      
+      <!-- Excitation level -->
+      <text x="15" y="38" fill="#718096" font-size="10">Excitation:</text>
+      <text x="185" y="38" text-anchor="end" fill="${excitation > 80 ? '#4ade80' : excitation > 50 ? '#f59e0b' : '#ef4444'}" font-size="12" font-weight="600">${excitation}%</text>
+      
+      <!-- Excitation bar with unity marker -->
+      <rect x="15" y="45" width="170" height="10" rx="2" fill="#0d1117" stroke="#3a4451"/>
+      <rect x="17" y="47" width="${excitation * 1.66}" height="6" rx="1" fill="${excitation > 80 ? '#4ade80' : excitation > 50 ? '#f59e0b' : '#ef4444'}"/>
+      <!-- Unity PF marker on excitation bar -->
+      <line x1="${17 + unityExcitation * 1.66}" y1="44" x2="${17 + unityExcitation * 1.66}" y2="56" stroke="#4ade80" stroke-width="2"/>
+      <text x="${17 + unityExcitation * 1.66}" y="64" text-anchor="middle" fill="#4ade80" font-size="7">PF=1</text>
+      
+      <!-- PF indicator -->
+      <text x="100" y="82" text-anchor="middle" fill="#718096" font-size="9">Power Factor</text>
+      <rect x="15" y="89" width="170" height="14" rx="2" fill="#0d1117" stroke="#3a4451"/>
+      <line x1="100" y1="87" x2="100" y2="105" stroke="#fff" stroke-width="1" opacity="0.5"/>
+      ${pfAngle >= 0 ? `
+        <rect x="100" y="91" width="${Math.min(pfAngle * 1.5, 85)}" height="10" rx="1" fill="#00d4ff"/>
+      ` : `
+        <rect x="${100 + pfAngle * 1.5}" y="91" width="${Math.min(Math.abs(pfAngle) * 1.5, 85)}" height="10" rx="1" fill="#f59e0b"/>
+      `}
+      <text x="20" y="115" fill="#f59e0b" font-size="8">LAG</text>
+      <text x="95" y="115" fill="#4ade80" font-size="8">1.0</text>
+      <text x="175" y="115" text-anchor="end" fill="#00d4ff" font-size="8">LEAD</text>
+      
+      <!-- PF value -->
+      <text x="100" y="138" text-anchor="middle" fill="${pfType === 'unity' ? '#4ade80' : pfType === 'lead' ? '#00d4ff' : '#f59e0b'}" font-size="16" font-weight="700">PF: ${powerFactor.toFixed(2)}</text>
+      <text x="100" y="153" text-anchor="middle" fill="#718096" font-size="10">${pfType.toUpperCase()}</text>
+      
+      <!-- Explanation - now shows load-dependent behaviour -->
+      <text x="100" y="170" text-anchor="middle" fill="#4a5568" font-size="8">Unity PF @ ${unityExcitation.toFixed(0)}% (load: ${absTorqueGlobal.toFixed(0)}%)</text>
+      <text x="100" y="183" text-anchor="middle" fill="#4a5568" font-size="8">↑ Load → ↑ Excitation for PF=1</text>
+        `;
+      })()}
+    </g>
+  `;
+  
+  info.innerHTML = `
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">MOTOR STATUS</div>
+      <div style="color: ${running ? 'var(--power-motor)' : 'var(--muted)'}; font-size: 16px; font-weight: 600;">${running ? 'RUNNING' : 'STOPPED'}</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">EXCITATION</div>
+      <div style="color: ${excitation > 80 ? 'var(--power-motor)' : excitation > 50 ? 'var(--warning)' : 'var(--alarm)'}; font-size: 16px; font-weight: 600;">${excitation}%</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">TIME SCALE</div>
+      <div style="color: var(--accent); font-size: 14px; font-weight: 600;">${zoomTimeScale}x ${zoomPaused ? '(PAUSED)' : ''}</div>
+    </div>
+  `;
+}
+
+function drawTransformerZoom(svg, info) {
+  const t = zoomTime;
+  const running = state.driveRunning;
+  const loadLevel = zoomParams.loadLevel;
+  const showFlux = zoomParams.showFluxLines;
+  
+  // AC waveform animation
+  const acPhase = t * 10;
+  
+  // Generate primary and secondary waveforms
+  const genWave = (amplitude, phaseOffset, yOffset) => {
+    let path = `M0,${yOffset}`;
+    for (let i = 1; i <= 150; i++) {
+      const x = i * 2;  // 0 to 300px
+      const y = yOffset - amplitude * Math.sin((i / 150) * Math.PI * 6 + acPhase + phaseOffset);
+      path += ` L${x},${y}`;
+    }
+    return path;
+  };
+  
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="zoomGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:#1e2836"/>
+        <stop offset="100%" style="stop-color:#0d1117"/>
+      </linearGradient>
+      <linearGradient id="coreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#4a5568"/>
+        <stop offset="50%" style="stop-color:#718096"/>
+        <stop offset="100%" style="stop-color:#4a5568"/>
+      </linearGradient>
+    </defs>
+    
+    <!-- Transformer Diagram -->
+    <g transform="translate(20, 20)">
+      <text x="150" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Step-Down Transformer (11kV → 2.3kV)</text>
+      
+      <!-- Transformer Tank (oil filled) -->
+      <rect x="10" y="15" width="280" height="270" rx="6" fill="#1a1f2e" stroke="#4a5568" stroke-width="2"/>
+      
+      <!-- Core - shell type with 3 limbs (inside tank) -->
+      <!-- Top yoke -->
+      <rect x="25" y="35" width="250" height="20" fill="url(#coreGrad)"/>
+      <!-- Bottom yoke -->
+      <rect x="25" y="245" width="250" height="20" fill="url(#coreGrad)"/>
+      <!-- Left limb -->
+      <rect x="25" y="35" width="20" height="230" fill="url(#coreGrad)"/>
+      <!-- Centre limb (main) -->
+      <rect x="140" y="35" width="20" height="230" fill="url(#coreGrad)"/>
+      <!-- Right limb -->
+      <rect x="255" y="35" width="20" height="230" fill="url(#coreGrad)"/>
+      
+      <!-- Windings -->
+      <!-- Primary (left window, HV, thinner wire) -->
+      <g>
+        <text x="82" y="58" text-anchor="middle" fill="#f59e0b" font-size="9" font-weight="600">PRI 11kV</text>
+        ${Array.from({length: 7}, (_, i) => {
+          const y = 75 + i * 24;
+          const brightness = running ? 0.5 + 0.5 * Math.abs(Math.sin(acPhase + i * 0.4)) : 0.3;
+          return `<ellipse cx="82" cy="${y}" rx="28" ry="9" fill="none" stroke="#f59e0b" stroke-width="2" opacity="${brightness}"/>`;
+        }).join('')}
+      </g>
+      
+      <!-- Secondary (right window, LV, thicker wire) -->
+      <g>
+        <text x="217" y="58" text-anchor="middle" fill="#00d4ff" font-size="9" font-weight="600">SEC 2.3kV</text>
+        ${Array.from({length: 7}, (_, i) => {
+          const y = 75 + i * 24;
+          const brightness = running ? 0.5 + 0.5 * Math.abs(Math.sin(acPhase + i * 0.4)) : 0.3;
+          return `<ellipse cx="217" cy="${y}" rx="28" ry="9" fill="none" stroke="#00d4ff" stroke-width="3" opacity="${brightness}"/>`;
+        }).join('')}
+      </g>
+      
+      <!-- Magnetic flux lines in core -->
+      ${showFlux && running ? `
+        <g opacity="0.7">
+          ${[0, 1, 2].map(i => {
+            const offset = (t * 40 + i * 25) % 60;
+            return `
+              <path d="M150,${50 + offset} L150,${80 + offset} Q82,${90 + offset} 82,${130 + offset} Q82,${170 + offset} 150,${180 + offset} L150,${210 + offset}" 
+                    fill="none" stroke="#4ade80" stroke-width="2" stroke-dasharray="5,3"/>
+              <path d="M150,${50 + offset} L150,${80 + offset} Q217,${90 + offset} 217,${130 + offset} Q217,${170 + offset} 150,${180 + offset} L150,${210 + offset}" 
+                    fill="none" stroke="#4ade80" stroke-width="2" stroke-dasharray="5,3"/>
+            `;
+          }).join('')}
+        </g>
+      ` : ''}
+      
+      <!-- Tank label -->
+      <text x="150" y="298" text-anchor="middle" fill="#4a5568" font-size="8">OIL FILLED TANK</text>
+      
+      <!-- Conservator tank (to the right, connected by pipe) -->
+      <g transform="translate(300, 20)">
+        <text x="50" y="0" text-anchor="middle" fill="#718096" font-size="9">CONSERVATOR</text>
+        <rect x="10" y="10" width="80" height="40" rx="4" fill="#1a1f2e" stroke="#4a5568" stroke-width="2"/>
+        <!-- Oil level indicator -->
+        <rect x="70" y="15" width="15" height="30" rx="2" fill="#0d1117" stroke="#3a4451"/>
+        <rect x="72" y="25" width="11" height="18" rx="1" fill="#f59e0b" opacity="0.5"/>
+        <text x="77" y="48" text-anchor="middle" fill="#718096" font-size="6">LEVEL</text>
+        <!-- Pipe to tank -->
+        <line x1="0" y1="30" x2="10" y2="30" stroke="#4a5568" stroke-width="4"/>
+      </g>
+      <line x1="290" y1="50" x2="300" y2="50" stroke="#4a5568" stroke-width="4"/>
+      
+      <!-- Buchholz Relay (between tank and conservator) -->
+      <g transform="translate(300, 80)">
+        <rect x="10" y="0" width="80" height="55" rx="4" fill="#0d1117" stroke="#3a4451" stroke-width="2"/>
+        <text x="50" y="12" text-anchor="middle" fill="#718096" font-size="8">BUCHHOLZ</text>
+        <!-- Two float chambers -->
+        <circle cx="30" cy="32" r="14" fill="#1e2836" stroke="${running ? '#4ade80' : '#4a5568'}" stroke-width="2"/>
+        <circle cx="70" cy="32" r="14" fill="#1e2836" stroke="${running ? '#4ade80' : '#4a5568'}" stroke-width="2"/>
+        <!-- Float indicators -->
+        <circle cx="30" cy="32" r="6" fill="${running ? '#4ade80' : '#4a5568'}"/>
+        <circle cx="70" cy="32" r="6" fill="${running ? '#4ade80' : '#4a5568'}"/>
+        <!-- Labels -->
+        <text x="30" y="52" text-anchor="middle" fill="#f59e0b" font-size="7">ALM</text>
+        <text x="70" y="52" text-anchor="middle" fill="#ef4444" font-size="7">TRIP</text>
+        <!-- Pipe connections -->
+        <line x1="0" y1="27" x2="10" y2="27" stroke="#4a5568" stroke-width="4"/>
+      </g>
+      <line x1="290" y1="107" x2="300" y2="107" stroke="#4a5568" stroke-width="4"/>
+      
+      <!-- Cross-section inset -->
+      <g transform="translate(300, 160)">
+        <text x="50" y="0" text-anchor="middle" fill="#718096" font-size="9">CROSS-SECTION</text>
+        <rect x="10" y="10" width="80" height="70" rx="4" fill="#0d1117" stroke="#3a4451"/>
+        <!-- Core -->
+        <rect x="40" y="25" width="20" height="40" fill="url(#coreGrad)"/>
+        <!-- Secondary (inner) -->
+        <rect x="32" y="28" width="8" height="34" fill="none" stroke="#00d4ff" stroke-width="2" rx="2"/>
+        <rect x="60" y="28" width="8" height="34" fill="none" stroke="#00d4ff" stroke-width="2" rx="2"/>
+        <!-- Primary (outer) -->
+        <rect x="22" y="25" width="10" height="40" fill="none" stroke="#f59e0b" stroke-width="2" rx="2"/>
+        <rect x="68" y="25" width="10" height="40" fill="none" stroke="#f59e0b" stroke-width="2" rx="2"/>
+        <!-- Labels -->
+        <text x="50" y="75" text-anchor="middle" fill="#718096" font-size="7">LV inner, HV outer</text>
+      </g>
+    </g>
+    
+    <!-- Voltage Waveforms -->
+    <g transform="translate(480, 30)">
+      <text x="160" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Voltage Waveforms</text>
+      
+      <!-- Primary voltage -->
+      <rect x="0" y="20" width="320" height="80" rx="4" fill="#0d1117" stroke="#3a4451"/>
+      <text x="10" y="35" fill="#f59e0b" font-size="10">Primary (11 kV)</text>
+      <line x1="10" y1="60" x2="310" y2="60" stroke="#2a3441" stroke-dasharray="4,4"/>
+      ${running ? `<path d="${genWave(25, 0, 60)}" fill="none" stroke="#f59e0b" stroke-width="2" transform="translate(10, 0)"/>` : ''}
+      
+      <!-- Secondary voltage -->
+      <rect x="0" y="110" width="320" height="80" rx="4" fill="#0d1117" stroke="#3a4451"/>
+      <text x="10" y="125" fill="#00d4ff" font-size="10">Secondary (2.3 kV)</text>
+      <line x1="10" y1="150" x2="310" y2="150" stroke="#2a3441" stroke-dasharray="4,4"/>
+      ${running ? `<path d="${genWave(25 * (2.3/11), 0, 150)}" fill="none" stroke="#00d4ff" stroke-width="2" transform="translate(10, 0)"/>` : ''}
+    </g>
+    
+    <!-- Transformer Data -->
+    <g transform="translate(480, 220)">
+      <text x="160" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Specifications</text>
+      
+      <rect x="0" y="15" width="150" height="130" rx="6" fill="url(#zoomGrad)" stroke="#3a4451"/>
+      <text x="15" y="40" fill="#718096" font-size="10">Turns Ratio:</text>
+      <text x="135" y="40" text-anchor="end" fill="#e2e8f0" font-size="10">4.78:1</text>
+      <text x="15" y="60" fill="#718096" font-size="10">Rating:</text>
+      <text x="135" y="60" text-anchor="end" fill="#e2e8f0" font-size="10">${(params.maxPower/1000 * 1.1).toFixed(1)} MVA</text>
+      <text x="15" y="80" fill="#718096" font-size="10">Vector Group:</text>
+      <text x="135" y="80" text-anchor="end" fill="#e2e8f0" font-size="10">Dyn11</text>
+      <text x="15" y="100" fill="#718096" font-size="10">Impedance:</text>
+      <text x="135" y="100" text-anchor="end" fill="#e2e8f0" font-size="10">6%</text>
+      <text x="15" y="120" fill="#718096" font-size="10">Cooling:</text>
+      <text x="135" y="120" text-anchor="end" fill="#e2e8f0" font-size="10">ONAN/ONAF</text>
+      
+      <!-- Load indicator -->
+      <rect x="170" y="15" width="150" height="130" rx="6" fill="url(#zoomGrad)" stroke="#3a4451"/>
+      <text x="245" y="40" text-anchor="middle" fill="#718096" font-size="10">Load Level</text>
+      <rect x="185" y="50" width="120" height="20" rx="3" fill="#0d1117" stroke="#3a4451"/>
+      <rect x="187" y="52" width="${loadLevel * 1.16}" height="16" rx="2" fill="${loadLevel > 80 ? '#f59e0b' : loadLevel > 100 ? '#ef4444' : '#4ade80'}"/>
+      <text x="245" y="90" text-anchor="middle" fill="${loadLevel > 80 ? '#f59e0b' : '#4ade80'}" font-size="18" font-weight="700">${loadLevel}%</text>
+      
+      <text x="185" y="115" fill="#718096" font-size="9">Winding Temp:</text>
+      <text x="305" y="115" text-anchor="end" fill="${loadLevel > 80 ? '#f59e0b' : '#e2e8f0'}" font-size="10">${(65 + loadLevel * 0.4).toFixed(0)}°C</text>
+      <text x="185" y="135" fill="#718096" font-size="9">Oil Temp:</text>
+      <text x="305" y="135" text-anchor="end" fill="#e2e8f0" font-size="10">${(45 + loadLevel * 0.25).toFixed(0)}°C</text>
+    </g>
+  `;
+  
+  info.innerHTML = `
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">STATUS</div>
+      <div style="color: ${running ? 'var(--power-motor)' : 'var(--muted)'}; font-size: 16px; font-weight: 600;">${running ? 'ENERGISED' : 'DE-ENERGISED'}</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">BUCHHOLZ</div>
+      <div style="color: var(--power-motor); font-size: 14px; font-weight: 600;">HEALTHY</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">OIL TEMP</div>
+      <div style="color: ${loadLevel > 80 ? 'var(--warning)' : 'var(--text)'}; font-size: 16px; font-weight: 600;">${(45 + loadLevel * 0.25).toFixed(0)}°C</div>
+    </div>
+  `;
+}
+
+function drawPodZoom(svg, info) {
+  const t = zoomTime;
+  const running = state.driveRunning;
+  const rpm = Math.abs(state.motorSpeed);
+  const azimuth = zoomParams.azimuthAngle;
+  
+  // Propeller rotation - slower for visibility
+  // Use physics-accurate angle — same rotorAngle, scaled for 5-blade prop visual
+  const propAngle = running ? state.rotorAngle : 0;
+  
+  // Calculate thrust vector
+  const thrustMag = running ? (rpm / params.maxRPM) * 100 : 0;
+  const thrustX = thrustMag * Math.sin(azimuth * Math.PI / 180);
+  const thrustY = -thrustMag * Math.cos(azimuth * Math.PI / 180);
+  
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="zoomGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:#1e2836"/>
+        <stop offset="100%" style="stop-color:#0d1117"/>
+      </linearGradient>
+      <linearGradient id="podGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#2a3f5f"/>
+        <stop offset="50%" style="stop-color:#3a5f8f"/>
+        <stop offset="100%" style="stop-color:#2a3f5f"/>
+      </linearGradient>
+      <linearGradient id="bladeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#4a5568"/>
+        <stop offset="50%" style="stop-color:#718096"/>
+        <stop offset="100%" style="stop-color:#4a5568"/>
+      </linearGradient>
+    </defs>
+    
+    <!-- LEFT COLUMN: Side View -->
+    <g transform="translate(15, 20)">
+      <text x="90" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Side View</text>
+      
+      <!-- Strut (vertical support) -->
+      <rect x="70" y="22" width="40" height="75" fill="url(#podGrad)" stroke="#4a5568" stroke-width="2"/>
+      <text x="90" y="62" text-anchor="middle" fill="#fff" font-size="9">STRUT</text>
+      
+      <!-- Slew ring indicator -->
+      <ellipse cx="90" cy="97" rx="35" ry="7" fill="#1a2332" stroke="#f59e0b" stroke-width="2"/>
+      <text x="138" y="100" fill="#f59e0b" font-size="8">SLEW</text>
+      
+      <!-- Pod body (nacelle) -->
+      <ellipse cx="90" cy="195" rx="42" ry="105" fill="url(#podGrad)" stroke="#4a5568" stroke-width="2"/>
+      
+      <!-- Motor housing inside pod -->
+      <rect x="58" y="130" width="64" height="60" rx="4" fill="#1a2332" stroke="#3a4451" stroke-width="2"/>
+      <text x="90" y="155" text-anchor="middle" fill="#4ade80" font-size="10" font-weight="600">MOTOR</text>
+      <text x="90" y="175" text-anchor="middle" fill="#e2e8f0" font-size="11">${rpm.toFixed(0)} RPM</text>
+      
+      <!-- Shaft -->
+      <rect x="82" y="190" width="16" height="55" fill="#4a5568" stroke="#718096" stroke-width="1"/>
+      
+      <!-- Propeller hub -->
+      <ellipse cx="90" cy="255" rx="20" ry="12" fill="#2a3441" stroke="#4a5568" stroke-width="2"/>
+      
+      <!-- Fixed Pitch Propeller blades -->
+      <g transform="translate(90, 255)">
+        ${[0, 72, 144, 216, 288].map((angle) => {
+          return `
+            <g transform="rotate(${angle + propAngle * 180 / Math.PI}, 0, 0)">
+              <ellipse cx="0" cy="-35" rx="7" ry="26" fill="url(#bladeGrad)" stroke="#718096" stroke-width="1"/>
+            </g>
+          `;
+        }).join('')}
+      </g>
+      
+      <!-- FPP label -->
+      <text x="90" y="310" text-anchor="middle" fill="#718096" font-size="10">5-Blade Fixed Pitch</text>
+      
+      <!-- Pod specs below side view -->
+      <rect x="5" y="325" width="170" height="80" rx="4" fill="url(#zoomGrad)" stroke="#3a4451"/>
+      <text x="90" y="345" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="600">Pod Specifications</text>
+      <text x="15" y="365" fill="#718096" font-size="9">Type: <tspan fill="#e2e8f0">Azipod CO</tspan></text>
+      <text x="15" y="382" fill="#718096" font-size="9">Power: <tspan fill="#e2e8f0">${(params.maxPower/1000).toFixed(1)} MW</tspan></text>
+      <text x="15" y="399" fill="#718096" font-size="9">Diameter: <tspan fill="#e2e8f0">5.8 m</tspan></text>
+      <text x="100" y="365" fill="#718096" font-size="9">Motor: <tspan fill="#e2e8f0">Sync PM</tspan></text>
+      <text x="100" y="382" fill="#718096" font-size="9">Prop: <tspan fill="#e2e8f0">5-blade FPP</tspan></text>
+      <text x="100" y="399" fill="#718096" font-size="9">RPM: <tspan fill="#e2e8f0">0-140</tspan></text>
+    </g>
+    
+    <!-- CENTRE COLUMN: Plan View with Azimuth -->
+    <g transform="translate(220, 20)">
+      <text x="130" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Plan View - Azimuth Control</text>
+      
+      <!-- FWD marker at top -->
+      <text x="130" y="22" text-anchor="middle" fill="#718096" font-size="10">▲ FWD</text>
+      
+      <!-- Ship hull outline -->
+      <path d="M35,55 Q130,15 225,55 L225,280 Q130,320 35,280 Z" fill="#0d1117" stroke="#3a4451" stroke-width="2"/>
+      <text x="130" y="50" text-anchor="middle" fill="#3a4451" font-size="10">HULL</text>
+      
+      <!-- Azimuth circle -->
+      <circle cx="130" cy="170" r="80" fill="none" stroke="#3a4451" stroke-width="1" stroke-dasharray="4,4"/>
+      
+      <!-- Angle markers -->
+      ${[0, 45, 90, 135, 180, -135, -90, -45].map(a => {
+        const rad = a * Math.PI / 180;
+        const x1 = 130 + 70 * Math.sin(rad);
+        const y1 = 170 - 70 * Math.cos(rad);
+        const x2 = 130 + 82 * Math.sin(rad);
+        const y2 = 170 - 82 * Math.cos(rad);
+        const labelX = 130 + 96 * Math.sin(rad);
+        const labelY = 170 - 96 * Math.cos(rad);
+        return `
+          <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#4a5568" stroke-width="1"/>
+          <text x="${labelX}" y="${labelY + 3}" text-anchor="middle" fill="#4a5568" font-size="9">${a}°</text>
+        `;
+      }).join('')}
+      
+      <!-- Pod position (rotates with azimuth) -->
+      <g transform="rotate(${azimuth}, 130, 170)">
+        <!-- Pod body (top view) -->
+        <ellipse cx="130" cy="170" rx="25" ry="50" fill="url(#podGrad)" stroke="#4a5568" stroke-width="2"/>
+        
+        <!-- Propeller disc -->
+        <ellipse cx="130" cy="220" rx="40" ry="10" fill="none" stroke="${running ? '#4ade80' : '#4a5568'}" stroke-width="2" 
+                 ${running ? 'stroke-dasharray="8,4"' : ''}/>
+        
+        <!-- Thrust direction arrow -->
+        ${running ? `
+          <line x1="130" y1="170" x2="130" y2="85" stroke="#4ade80" stroke-width="4"/>
+          <polygon points="130,75 121,93 139,93" fill="#4ade80"/>
+        ` : ''}
+      </g>
+      
+      <!-- Current azimuth readout -->
+      <rect x="50" y="345" width="160" height="40" rx="6" fill="#0d1117" stroke="#00d4ff" stroke-width="2"/>
+      <text x="130" y="372" text-anchor="middle" fill="#00d4ff" font-size="18" font-weight="700">AZIMUTH: ${azimuth}°</text>
+    </g>
+    
+    <!-- RIGHT COLUMN: Thrust Vector -->
+    <g transform="translate(500, 20)">
+      <text x="110" y="0" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700">Thrust Vector</text>
+      
+      <rect x="10" y="18" width="200" height="200" rx="6" fill="#0d1117" stroke="#3a4451"/>
+      
+      <!-- Grid lines -->
+      <line x1="110" y1="25" x2="110" y2="210" stroke="#2a3441" stroke-width="1"/>
+      <line x1="18" y1="118" x2="202" y2="118" stroke="#2a3441" stroke-width="1"/>
+      
+      <!-- Axis labels with colours -->
+      <text x="25" y="114" fill="#22c55e" font-size="10" font-weight="600">STBD</text>
+      <text x="195" y="114" text-anchor="end" fill="#ef4444" font-size="10" font-weight="600">PORT</text>
+      <text x="110" y="40" text-anchor="middle" fill="#718096" font-size="10">FWD</text>
+      <text x="110" y="205" text-anchor="middle" fill="#718096" font-size="10">AFT</text>
+      
+      <!-- Thrust vector arrow - green for STBD, red for PORT, cyan for straight -->
+      ${running ? (() => {
+        const thrustColour = azimuth > 45 ? '#ef4444' : azimuth < -45 ? '#22c55e' : '#00d4ff';
+        return `
+          <line x1="110" y1="118" x2="${110 + thrustX * 0.8}" y2="${118 + thrustY * 0.8}" stroke="${thrustColour}" stroke-width="5"/>
+          <circle cx="${110 + thrustX * 0.8}" cy="${118 + thrustY * 0.8}" r="7" fill="${thrustColour}"/>
+        `;
+      })() : `
+        <circle cx="110" cy="118" r="5" fill="#4a5568"/>
+      `}
+      
+      <!-- Thrust readout box -->
+      ${(() => {
+        const thrustColour = !running ? '#3a4451' : azimuth > 45 ? '#ef4444' : azimuth < -45 ? '#22c55e' : '#00d4ff';
+        const textColour = !running ? '#718096' : thrustColour;
+        const thrustDir = !running ? 'NO THRUST' : azimuth > 45 ? 'PORT' : azimuth < -45 ? 'STBD' : 'AHEAD';
+        return `
+          <rect x="35" y="235" width="150" height="40" rx="6" fill="#0d1117" stroke="${thrustColour}" stroke-width="2"/>
+          <text x="110" y="258" text-anchor="middle" fill="${textColour}" font-size="13" font-weight="700">${thrustDir}</text>
+          <text x="110" y="272" text-anchor="middle" fill="${textColour}" font-size="11">${running ? thrustMag.toFixed(0) + '% THRUST' : ''}</text>
+        `;
+      })()}
+      
+      <!-- Slew info below -->
+      <rect x="10" y="295" width="200" height="90" rx="6" fill="url(#zoomGrad)" stroke="#3a4451"/>
+      <text x="110" y="315" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">Slew System</text>
+      <text x="20" y="340" fill="#718096" font-size="10">Slew Rate:</text>
+      <text x="200" y="340" text-anchor="end" fill="#e2e8f0" font-size="10">2.5°/sec</text>
+      <text x="20" y="360" fill="#718096" font-size="10">Azimuth Range:</text>
+      <text x="200" y="360" text-anchor="end" fill="#e2e8f0" font-size="10">±180° (360° total)</text>
+      <text x="20" y="380" fill="#718096" font-size="10">Slew Motors:</text>
+      <text x="200" y="380" text-anchor="end" fill="#e2e8f0" font-size="10">2 × Hydraulic</text>
+    </g>
+  `;
+  
+  info.innerHTML = `
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">POD STATUS</div>
+      <div style="color: ${running ? 'var(--power-motor)' : 'var(--muted)'}; font-size: 16px; font-weight: 600;">${running ? 'RUNNING' : 'STOPPED'}</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">AZIMUTH</div>
+      <div style="color: var(--accent); font-size: 16px; font-weight: 600;">${azimuth}°</div>
+    </div>
+    <div style="background: var(--bg); padding: 12px; border-radius: 6px;">
+      <div style="color: var(--muted); font-size: 10px; margin-bottom: 4px;">THRUST</div>
+      <div style="color: ${running ? 'var(--power-motor)' : 'var(--muted)'}; font-size: 16px; font-weight: 600;">${running ? thrustMag.toFixed(0) + '%' : '0%'}</div>
+    </div>
+  `;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// PINNED PANELS — clone-on-pin, each fully independent
+// ═══════════════════════════════════════════════════════════
+const pinnedPanels = new Map();
+let   pinnedCount  = 0;
+
+function pinCurrentZoom() {
+  if (!currentZoom) return;
+
+  const clone = document.getElementById('zoomModal').cloneNode(true);
+  const pid   = 'pp' + (++pinnedCount);
+  clone.id        = pid;
+  clone.className = 'pinned-panel';
+
+  const idx = pinnedPanels.size;
+  Object.assign(clone.style, {
+    right: (20 + idx * 28) + 'px', bottom: (60 + idx * 28) + 'px',
+    left: 'auto', top: 'auto', width: '520px',
+    zIndex: String(9000 + pinnedCount),
+  });
+
+  // Re-ID all children so they don't clash with master
+  clone.querySelectorAll('[id]').forEach(el => {
+    if (el.id !== pid) el.id = pid + '_' + el.id;
+  });
+  const $c = s => clone.querySelector('#' + pid + '_' + s);
+
+  // Swap pin button for a badge
+  const pinBtn = clone.querySelector('.zoom-pin');
+  if (pinBtn) {
+    const badge = document.createElement('span');
+    badge.className = 'pinned-badge';
+    badge.textContent = '📌 PINNED';
+    pinBtn.replaceWith(badge);
+  }
+
+  // Wire close button to THIS panel
+  const closeBtn = clone.querySelector('.zoom-close');
+  if (closeBtn) closeBtn.onclick = () => closePinnedPanel(pid);
+
+  // Keep zoomControls visible — but rewire all inputs/buttons inside
+  // so they update zoomParams (the shared params object) directly.
+  // The inputs in the clone have already been re-IDed (pid_zoomRegenPower etc)
+  // so we wire by element type within the controls div rather than by ID.
+  const ctrl = $c('zoomControls');
+  if (ctrl) {
+    ctrl.style.display = '';  // keep visible
+    // Rewire range inputs to update zoomParams
+    ctrl.querySelectorAll('input[type="range"]').forEach(input => {
+      // Derive param name from original oninput attribute
+      const oinput = input.getAttribute('oninput') || '';
+      const m = oinput.match(/updateZoomParam\('(\w+)'/);
+      if (m) {
+        const param = m[1];
+        input.oninput = function() { updateZoomParam(param, this.value); };
+      }
+    });
+    // Rewire toggle buttons (currentPath, rotatingField, fluxLines)
+    ctrl.querySelectorAll('button').forEach(btn => {
+      const oc = btn.getAttribute('onclick') || '';
+      if (oc.includes('toggleCurrentPath'))   btn.onclick = toggleCurrentPath;
+      if (oc.includes('toggleRotatingField')) btn.onclick = toggleRotatingField;
+      if (oc.includes('toggleFluxLines'))     btn.onclick = toggleFluxLines;
+      if (oc.includes('triggerBrakeChopper')) btn.onclick = triggerBrakeChopper;
+    });
+  }
+
+  const ps = {
+    id: pid, component: currentZoom,
+    zoomTime: zoomTime, zoomTimeScale: zoomTimeScale,
+    zoomPaused: false, lastTime: performance.now(), el: clone, interval: null,
+    frozenRotorAngle: state.rotorAngle,  // snapshot for pause support
+  };
+
+  // Strip onclick HTML attributes from control buttons so they don't fire
+  // the global master functions (zoomSpeed, zoomTogglePause, zoomStep).
+  // We replace them with panel-specific handlers below.
+  ['zoomSlower','zoomNormal','zoomFaster','zoomPause','zoomStep'].forEach(id => {
+    const btn = $c(id);
+    if (btn) btn.removeAttribute('onclick');
+  });
+
+  const [slower, normal, faster, pauseBtn, stepBtn] =
+    ['zoomSlower','zoomNormal','zoomFaster','zoomPause','zoomStep'].map($c);
+
+  const setSpeed = s => {
+    ps.zoomTimeScale = s;
+    [slower, normal, faster].forEach((b, i) => b && b.classList.toggle('active', [0.5,1,2][i]===s));
+  };
+  if (slower) slower.onclick = () => setSpeed(0.5);
+  if (normal) normal.onclick = () => setSpeed(1);
+  if (faster) faster.onclick = () => setSpeed(2);
+  if (stepBtn) {
+    stepBtn.style.display='none';
+    // Wire to global zoomStep so ALL panels step together
+    stepBtn.onclick = () => zoomStep();
+  }
+  if (pauseBtn) pauseBtn.onclick = () => {
+    // Pause/resume the whole trainer — same as the master modal and header button
+    state.paused = !state.paused;
+    // Sync all pause button labels across master modal, header, and all pinned panels
+    syncPauseButtons();
+  };
+
+  document.body.appendChild(clone);
+  makePanelDraggable(clone);
+  addResizeHandle(clone);
+
+  ps.interval = setInterval(() => {
+    if (!ps.zoomPaused && !state.paused) {
+      const now = performance.now();
+      ps.zoomTime += (now - ps.lastTime) / 1000 * ps.zoomTimeScale;
+      ps.lastTime  = now;
+      ps.frozenRotorAngle = state.rotorAngle;  // track live angle when running
+    } else {
+      ps.lastTime = performance.now();
+      // frozenRotorAngle stays frozen — motor/prop hold position when paused
+    }
+    renderPinnedPanel(ps);
+  }, 50);
+
+  pinnedPanels.set(pid, ps);
+  closeZoom();  // free the master
+}
+
+function renderPinnedPanel(ps) {
+  const svg  = document.getElementById(ps.id + '_zoomSvg');
+  const info = document.getElementById(ps.id + '_zoomInfo');
+  if (!svg || !info) return;
+
+  const mSvg = document.getElementById('zoomSvg');
+  const mInfo= document.getElementById('zoomInfo');
+  const [st, sp, ss] = [zoomTime, zoomPaused, zoomTimeScale];
+
+  if (mSvg)  mSvg.id  = '__sv';
+  if (mInfo) mInfo.id = '__in';
+  svg.id  = 'zoomSvg'; info.id = 'zoomInfo';
+  zoomTime = ps.zoomTime; zoomPaused = ps.zoomPaused; zoomTimeScale = ps.zoomTimeScale;
+
+  // Swap in the panel's frozen rotor angle so motor/pod visuals
+  // respect panel-local pause state rather than the live physics value
+  const savedRotorAngle = state.rotorAngle;
+  state.rotorAngle = ps.frozenRotorAngle;
+
+  try { drawZoomView(ps.component); } catch(e) {}
+
+  state.rotorAngle = savedRotorAngle;  // restore for physics loop
+  svg.id  = ps.id + '_zoomSvg'; info.id = ps.id + '_zoomInfo';
+  if (mSvg)  mSvg.id  = 'zoomSvg';
+  if (mInfo) mInfo.id = 'zoomInfo';
+  zoomTime = st; zoomPaused = sp; zoomTimeScale = ss;
+
+  // Fix gradient ID collisions: rewrite all gradient/filter def IDs in this
+  // panel's SVG to be unique, and update all url(#...) references to match.
+  scopeSvgGradients(svg, ps.id);
+}
+
+function scopeSvgGradients(svg, prefix) {
+  // Collect all IDs defined in <defs>
+  const defs = svg.querySelectorAll('defs [id]');
+  if (!defs.length) return;
+  const idMap = {};
+  defs.forEach(el => {
+    const oldId = el.id;
+    const newId = prefix + '_' + oldId;
+    idMap[oldId] = newId;
+    el.id = newId;
+  });
+  // Update all fill/stroke/filter attributes that reference these IDs
+  svg.querySelectorAll('[fill],[stroke],[filter]').forEach(el => {
+    ['fill','stroke','filter'].forEach(attr => {
+      const val = el.getAttribute(attr);
+      if (val && val.startsWith('url(#')) {
+        const oldId = val.slice(5, -1);
+        if (idMap[oldId]) el.setAttribute(attr, 'url(#' + idMap[oldId] + ')');
+      }
+    });
+  });
+}
+
+function closePinnedPanel(pid) {
+  const ps = pinnedPanels.get(pid);
+  if (!ps) return;
+  clearInterval(ps.interval); ps.el.remove(); pinnedPanels.delete(pid);
+}
+
+function syncPauseButtons() {
+  const paused = state.paused;
+  const label  = paused ? '▶ Play' : '⏸ Pause';
+
+  // Header PAUSE button
+  const headerBtn = document.getElementById('pauseBtn');
+  if (headerBtn) {
+    headerBtn.textContent = paused ? '▶ RESUME' : '⏸ PAUSE';
+    headerBtn.classList.toggle('paused', paused);
+  }
+
+  // Master modal pause button
+  const masterPause = document.getElementById('zoomPause');
+  if (masterPause) {
+    masterPause.textContent = label;
+    masterPause.classList.toggle('active', paused);
+    const masterStep = document.getElementById('zoomStep');
+    if (masterStep) masterStep.style.display = paused ? 'inline-block' : 'none';
+  }
+
+  // All pinned panels
+  pinnedPanels.forEach(ps => {
+    ps.zoomPaused = paused;  // keep in sync so frozenRotorAngle logic is consistent
+    ps.lastTime   = performance.now();
+    const btn = ps.el.querySelector('.zoom-ctrl-btn[id$="_zoomPause"]') ||
+                ps.el.querySelector('[id$="_zoomPause"]');
+    if (btn) {
+      btn.textContent = label;
+      btn.classList.toggle('active', paused);
+    }
+    const step = ps.el.querySelector('[id$="_zoomStep"]');
+    if (step) step.style.display = paused ? 'inline-block' : 'none';
+  });
+}
+
+let _topZ = 9100;
+
+function bringToFront(el) {
+  _topZ += 1;
+  el.style.zIndex = String(_topZ);
+}
+
+function makePanelDraggable(el) {
+  const header = el.querySelector('.zoom-header');
+  if (!header) return;
+  let dragging = false, ox = 0, oy = 0;
+
+  el.addEventListener('mousedown', () => { bringToFront(el); });
+
+  header.addEventListener('mousedown', e => {
+    if (e.target.tagName === 'BUTTON' || e.target.classList.contains('pinned-badge')) return;
+    dragging = true;
+    const r = el.getBoundingClientRect(); ox = e.clientX-r.left; oy = e.clientY-r.top;
+    el.style.zIndex = String(parseInt(el.style.zIndex||'9000') + 100);
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    el.style.left   = Math.max(0, Math.min(e.clientX-ox, innerWidth -el.offsetWidth )) + 'px';
+    el.style.top    = Math.max(0, Math.min(e.clientY-oy, innerHeight-el.offsetHeight)) + 'px';
+    el.style.right  = 'auto'; el.style.bottom = 'auto';
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+}
+
+function addResizeHandle(el) {
+  const content = el.querySelector('.zoom-content');
+  if (!content) return;
+
+  // Create the handle
+  const handle = document.createElement('div');
+  handle.className = 'pinned-resize-handle';
+  handle.title = 'Drag to resize';
+  handle.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18">
+    <line x1="4"  y1="18" x2="18" y2="4"  stroke="#00d4ff" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="9"  y1="18" x2="18" y2="9"  stroke="#00d4ff" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="14" y1="18" x2="18" y2="14" stroke="#00d4ff" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`;
+  content.appendChild(handle);
+
+  let resizing = false, startX, startY, startW, startH;
+
+  handle.addEventListener('mousedown', e => {
+    resizing = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startW = el.offsetWidth;
+    startH = el.offsetHeight;
+    el.style.zIndex = String(parseInt(el.style.zIndex||'9000') + 100);
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!resizing) return;
+    const newW = Math.max(320, startW + (e.clientX - startX));
+    const newH = Math.max(200, startH + (e.clientY - startY));
+    el.style.width  = newW + 'px';
+    el.style.height = newH + 'px';
+    // Also let the svg inside fill the new height
+    const svg = el.querySelector('.zoom-svg');
+    if (svg) {
+      const body = el.querySelector('.zoom-body');
+      const header = el.querySelector('.zoom-header');
+      const info = el.querySelector('[id$="_zoomInfo"]') || el.querySelector('#zoomInfo');
+      const usedH = (header ? header.offsetHeight : 50) + (info ? info.offsetHeight + 24 : 0) + 20;
+      svg.style.height = Math.max(150, newH - usedH) + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', () => { resizing = false; });
+}
+
+// Initialize on load
+window.onload = init;
+</script>
+
+</body>
+</html>
