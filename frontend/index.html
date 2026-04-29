@@ -95,6 +95,7 @@
   }
   .btn:hover { opacity: 0.9; }
   .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
   .btn-ghost {
     background: transparent; color: var(--accent);
     border: 1px solid var(--border-strong);
@@ -115,7 +116,6 @@
 
   .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
-  /* PIN display */
   .pin-hero {
     font-family: var(--mono); font-size: 48px; font-weight: 500;
     letter-spacing: 20px; text-align: center;
@@ -124,7 +124,6 @@
     margin: 8px 0;
   }
 
-  /* PIN input */
   .pin-row { display: flex; gap: 10px; justify-content: center; margin: 16px 0; }
   .pin-digit {
     width: 56px; height: 68px;
@@ -136,17 +135,14 @@
   }
   .pin-digit:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
 
-  /* QR */
   #qr-container { display: flex; justify-content: center; margin: 12px 0; }
   #qr-container canvas, #qr-container img { border-radius: var(--radius-sm); }
 
-  /* Stats */
   .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
   .stat-card { background: var(--surface2); border-radius: var(--radius-sm); padding: 14px 12px; text-align: center; }
   .stat-num { font-size: 28px; font-weight: 600; color: var(--text); font-family: var(--mono); }
   .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
 
-  /* Trainer toggles */
   .trainer-toggle {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 14px; border: 1px solid var(--border);
@@ -166,7 +162,6 @@
   }
   .trainer-toggle.on .check-box { background: var(--accent); border-color: var(--accent); }
 
-  /* Duration buttons */
   .dur-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
   .dur-btn {
     padding: 7px 14px; border: 1px solid var(--border-strong);
@@ -177,7 +172,6 @@
   .dur-btn:hover { background: var(--surface2); }
   .dur-btn.on { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 500; }
 
-  /* Participant rows */
   .p-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px;
@@ -191,7 +185,6 @@
     align-items: center; justify-content: center; flex-shrink: 0;
   }
 
-  /* Trainer chips (access screen) */
   .trainer-chip {
     display: flex; align-items: center; gap: 10px;
     padding: 12px 14px; border: 1px solid var(--border);
@@ -202,7 +195,6 @@
   }
   .trainer-chip:hover { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
 
-  /* Nav steps */
   .step-nav { display: flex; gap: 6px; margin-bottom: 24px; flex-wrap: wrap; }
   .step-btn {
     font-size: 12px; padding: 5px 12px; border-radius: 20px;
@@ -250,7 +242,6 @@
     </div>
   </div>
 
-  <!-- Step nav (hidden on login) -->
   <div class="step-nav" id="step-nav" style="display:none;">
     <button class="step-btn" id="btn-login" onclick="nav('login')">1 · Login</button>
     <button class="step-btn" id="btn-create" onclick="nav('create')">2 · Create session</button>
@@ -268,11 +259,9 @@
       <input type="email" id="login-email" placeholder="you@whitebridgemarine.com" autocomplete="email">
       <label>Password</label>
       <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-      <button class="btn" onclick="doLogin()">Sign in</button>
+      <button class="btn" id="login-btn" onclick="doLogin()">Sign in</button>
       <p class="err" id="login-err">Incorrect email or password. Try again.</p>
-      <div class="magic-link">Or <a onclick="magicLink()">send a magic link</a> to your email</div>
     </div>
-    <p style="font-size:12px;color:var(--text-faint);text-align:center;margin-top:8px;">Demo: instructor@whitebridgemarine.com / csmart2026</p>
   </div>
 
   <!-- 2. CREATE SESSION -->
@@ -325,7 +314,8 @@
       <label style="margin-top:4px;">Expected participants</label>
       <input type="number" id="expected" placeholder="12" min="1" max="100">
 
-      <button class="btn" onclick="createSession()">Generate PIN &amp; QR code →</button>
+      <button class="btn" id="create-btn" onclick="createSession()">Generate PIN &amp; QR code →</button>
+      <p class="err" id="create-err"></p>
     </div>
   </div>
 
@@ -372,7 +362,6 @@
       </div>
 
       <div class="btn-row">
-        <button class="btn btn-ghost btn-sm" onclick="simJoin()">+ Simulate join</button>
         <button class="btn btn-danger btn-sm" onclick="endSession()">End session</button>
       </div>
     </div>
@@ -394,7 +383,7 @@
       <label>Your name</label>
       <input type="text" id="pname" placeholder="Full name" onkeydown="if(event.key==='Enter')joinSession()">
 
-      <button class="btn" onclick="joinSession()">Join session</button>
+      <button class="btn" id="join-btn" onclick="joinSession()">Join session</button>
       <p class="err" id="join-err">Incorrect PIN — check the screen and try again.</p>
       <p class="hint" style="margin-top:12px;">Or scan the QR code on the screen to join automatically</p>
       <p style="font-size:11px;color:var(--text-faint);text-align:center;margin-top:32px;"><a onclick="nav('login');document.getElementById('step-nav').style.display='flex';" style="color:var(--text-faint);cursor:pointer;text-decoration:none;">Instructor login</a></p>
@@ -424,22 +413,10 @@
 
 </div>
 
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-  // State
-  let SESSION_PIN = '';
-  let sessionName = '';
-  let sessionDuration = '2 hours';
-  let sessionTrainers = [];
-  let pCount = 0;
-  let timerSecs = 0;
-  let timerInt = null;
-  let simIdx = 0;
+  const API = 'https://your-app.herokuapp.com'; // replace with Heroku URL after deploy
 
-  const DEMO_EMAIL = 'instructor@whitebridgemarine.com';
-  const DEMO_PASS = 'csmart2026';
-  const SIM_NAMES = ['J. Kowalski','M. Petrov','A. Santos','L. Nguyen','C. Okafor','R. Lindqvist','T. Yamamoto','S. Eriksen','B. Osei','F. Martins'];
-
-  // Trainer URLs (map name to URL)
   const TRAINER_URLS = {
     'VSI PWM Propulsion Drive Simulator': 'https://trainers.whitebridgemarine.com/VSI%20PWM%20Propulsion%20Drive%20Simulator.html',
     'Cycloconverter PEM Propulsion Simulator': 'https://trainers.whitebridgemarine.com/cycloconverter_v8.8.html',
@@ -448,13 +425,13 @@
     'ECR Tank Trainer': 'https://trainers.whitebridgemarine.com/ecr_tank_trainer.html'
   };
 
-  function genPIN() {
-    return Math.floor(1000 + Math.random() * 9000).toString();
-  }
-
-  function fmtPIN(pin) {
-    return pin.split('').join(' ');
-  }
+  let token = localStorage.getItem('wbm_token') || '';
+  let sessionId = '';
+  let sessionDuration = '2 hours';
+  let pCount = 0;
+  let timerSecs = 0;
+  let timerInt = null;
+  let socket = null;
 
   function nav(screen) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -469,22 +446,40 @@
     if (b) { b.classList.remove('active'); b.classList.add('done'); }
   }
 
-  function doLogin() {
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.textContent = loading ? 'Please wait…' : btn.dataset.label || btn.textContent;
+  }
+
+  async function doLogin() {
     const email = document.getElementById('login-email').value.trim();
     const pass = document.getElementById('login-pass').value;
     const err = document.getElementById('login-err');
-    if (email === DEMO_EMAIL && pass === DEMO_PASS) {
-      err.style.display = 'none';
+    err.style.display = 'none';
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Login failed');
+      token = data.token;
+      localStorage.setItem('wbm_token', token);
       document.getElementById('step-nav').style.display = 'flex';
       markDone('login');
       nav('create');
-    } else {
+    } catch {
       err.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
     }
-  }
-
-  function magicLink() {
-    alert('In the live app, a magic link would be sent to your email address.');
   }
 
   function selDur(el, val) {
@@ -503,110 +498,140 @@
     }
   }
 
-  function createSession() {
+  async function createSession() {
     const name = document.getElementById('sess-name').value.trim() || 'CSMART Training Session';
     const exp = parseInt(document.getElementById('expected').value) || 12;
-    sessionTrainers = Array.from(document.querySelectorAll('.trainer-toggle.on')).map(el => el.dataset.name);
+    const trainers = Array.from(document.querySelectorAll('.trainer-toggle.on')).map(el => el.dataset.name);
+    const errEl = document.getElementById('create-err');
+    errEl.style.display = 'none';
 
-    if (sessionTrainers.length === 0) {
-      alert('Please select at least one trainer to unlock.');
+    if (trainers.length === 0) {
+      errEl.textContent = 'Please select at least one trainer.';
+      errEl.style.display = 'block';
       return;
     }
 
-    sessionName = name;
-    SESSION_PIN = genPIN();
-    pCount = 0;
-    simIdx = 0;
-    timerSecs = 0;
+    const btn = document.getElementById('create-btn');
+    btn.disabled = true;
+    btn.textContent = 'Creating…';
 
-    // Dashboard
-    document.getElementById('dash-name').textContent = name;
-    document.getElementById('dash-expiry').textContent = 'Duration: ' + sessionDuration;
-    document.getElementById('dash-pin').textContent = fmtPIN(SESSION_PIN);
-    document.getElementById('dash-expected').textContent = exp;
-    document.getElementById('dash-joined').textContent = '0';
-    document.getElementById('dash-timer').textContent = '00:00';
-    document.getElementById('dash-participants').innerHTML = '<p style="font-size:13px;color:var(--text-faint);padding:12px 0;text-align:center;">Waiting for participants to join...</p>';
+    try {
+      const res = await fetch(`${API}/api/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name, duration: sessionDuration, trainers, expected: exp })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create session');
 
-    // QR
-    const joinUrl = window.location.href.split('?')[0] + '?pin=' + SESSION_PIN;
-    document.getElementById('join-url').textContent = joinUrl;
-    const qrEl = document.getElementById('qr-container');
-    qrEl.innerHTML = '';
-    new QRCode(qrEl, { text: joinUrl, width: 128, height: 128, colorDark: '#1A1A18', colorLight: '#FFFFFF', correctLevel: QRCode.CorrectLevel.M });
+      sessionId = data.id;
+      pCount = 0;
+      timerSecs = 0;
 
-    // Trainer list in dashboard
-    const dt = document.getElementById('dash-trainers');
-    dt.innerHTML = '';
-    sessionTrainers.forEach(t => {
-      const d = document.createElement('div');
-      d.className = 'trainer-chip';
-      d.style.cursor = 'default';
-      d.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>${t}`;
-      dt.appendChild(d);
-    });
+      // Dashboard
+      document.getElementById('dash-name').textContent = name;
+      document.getElementById('dash-expiry').textContent = 'Duration: ' + sessionDuration;
+      document.getElementById('dash-pin').textContent = data.pin.split('').join(' ');
+      document.getElementById('dash-expected').textContent = exp;
+      document.getElementById('dash-joined').textContent = '0';
+      document.getElementById('dash-timer').textContent = '00:00';
+      document.getElementById('dash-participants').innerHTML = '<p style="font-size:13px;color:var(--text-faint);padding:12px 0;text-align:center;">Waiting for participants to join...</p>';
 
-    // Trainer list for access screen
-    const at = document.getElementById('acc-trainers');
-    at.innerHTML = '';
-    sessionTrainers.forEach(t => {
-      const url = TRAINER_URLS[t] || '#';
-      const a = document.createElement('a');
-      a.className = 'trainer-chip';
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>${t}`;
-      at.appendChild(a);
-    });
+      // QR
+      const joinUrl = window.location.href.split('?')[0] + '?pin=' + data.pin;
+      document.getElementById('join-url').textContent = joinUrl;
+      const qrEl = document.getElementById('qr-container');
+      qrEl.innerHTML = '';
+      new QRCode(qrEl, { text: joinUrl, width: 128, height: 128, colorDark: '#1A1A18', colorLight: '#FFFFFF', correctLevel: QRCode.CorrectLevel.M });
 
-    document.getElementById('acc-session').textContent = name;
+      // Trainer list in dashboard
+      const dt = document.getElementById('dash-trainers');
+      dt.innerHTML = '';
+      trainers.forEach(t => {
+        const d = document.createElement('div');
+        d.className = 'trainer-chip';
+        d.style.cursor = 'default';
+        d.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>${t}`;
+        dt.appendChild(d);
+      });
 
-    // Timer
-    if (timerInt) clearInterval(timerInt);
-    timerInt = setInterval(() => {
-      timerSecs++;
-      const m = Math.floor(timerSecs / 60).toString().padStart(2,'0');
-      const s = (timerSecs % 60).toString().padStart(2,'0');
-      const el = document.getElementById('dash-timer');
-      if (el) el.textContent = m + ':' + s;
-    }, 1000);
+      // Trainer list for access screen
+      const at = document.getElementById('acc-trainers');
+      at.innerHTML = '';
+      trainers.forEach(t => {
+        const url = TRAINER_URLS[t] || '#';
+        const a = document.createElement('a');
+        a.className = 'trainer-chip';
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>${t}`;
+        at.appendChild(a);
+      });
 
-    markDone('create');
-    nav('dashboard');
+      document.getElementById('acc-session').textContent = name;
+
+      // Timer
+      if (timerInt) clearInterval(timerInt);
+      timerInt = setInterval(() => {
+        timerSecs++;
+        const m = Math.floor(timerSecs / 60).toString().padStart(2, '0');
+        const s = (timerSecs % 60).toString().padStart(2, '0');
+        const el = document.getElementById('dash-timer');
+        if (el) el.textContent = m + ':' + s;
+      }, 1000);
+
+      // Socket.io — join the session room for real-time updates
+      if (socket) socket.disconnect();
+      socket = io(API);
+      socket.emit('join:session', sessionId);
+      socket.on('participant:joined', ({ count, participant }) => {
+        pCount = count;
+        document.getElementById('dash-joined').textContent = pCount;
+        addParticipantRow(participant.name);
+      });
+
+      markDone('create');
+      nav('dashboard');
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate PIN & QR code →';
+    }
   }
 
-  function simJoin() {
-    if (!SESSION_PIN || simIdx >= SIM_NAMES.length) return;
-    const name = SIM_NAMES[simIdx++];
-    const initials = name.split(' ').map(p => p[0]).join('');
+  function addParticipantRow(name) {
     const list = document.getElementById('dash-participants');
-    if (pCount === 0) list.innerHTML = '';
+    if (pCount === 1) list.innerHTML = '';
+    const initials = name.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2);
     const row = document.createElement('div');
     row.className = 'p-row';
-    const status = Math.random() > 0.2 ? '<span class="pill pill-green pill-dot">Active</span>' : '<span class="pill pill-amber pill-dot">Idle</span>';
-    row.innerHTML = `<div class="p-info"><div class="avatar">${initials}</div><span>${name}</span></div>${status}`;
+    row.innerHTML = `<div class="p-info"><div class="avatar">${initials}</div><span>${name}</span></div><span class="pill pill-green pill-dot">Active</span>`;
     list.appendChild(row);
-    pCount++;
-    document.getElementById('dash-joined').textContent = pCount;
   }
 
-  function endSession() {
+  async function endSession() {
     if (!confirm('End session? All participants will immediately lose access.')) return;
-    SESSION_PIN = '';
+    try {
+      await fetch(`${API}/api/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+    } catch { /* session may already be gone */ }
+
+    sessionId = '';
     pCount = 0;
     if (timerInt) { clearInterval(timerInt); timerInt = null; }
-    document.getElementById('dash-joined').textContent = '0';
-    document.getElementById('dash-timer').textContent = '00:00';
-    document.getElementById('dash-pin').textContent = '— — — —';
-    document.getElementById('qr-container').innerHTML = '';
-    document.getElementById('dash-participants').innerHTML = '<p style="font-size:13px;color:var(--text-faint);padding:12px 0;text-align:center;">Session ended.</p>';
+    if (socket) { socket.disconnect(); socket = null; }
+
     markDone('dashboard');
     nav('create');
   }
 
   function mn(el, nextId) {
-    el.value = el.value.replace(/\D/g,'');
+    el.value = el.value.replace(/\D/g, '');
     if (el.value && nextId) document.getElementById(nextId).focus();
   }
 
@@ -616,20 +641,53 @@
     }
   }
 
-  function joinSession() {
-    const pin = ['d1','d2','d3','d4'].map(id => document.getElementById(id).value).join('');
+  async function joinSession() {
+    const pin = ['d1', 'd2', 'd3', 'd4'].map(id => document.getElementById(id).value).join('');
     const name = document.getElementById('pname').value.trim() || 'Participant';
     const err = document.getElementById('join-err');
-    if (!SESSION_PIN) { err.style.display = 'block'; return; }
-    if (pin === SESSION_PIN) {
-      err.style.display = 'none';
-      const initials = name.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0,2);
+    err.style.display = 'none';
+
+    if (pin.length !== 4) { err.style.display = 'block'; return; }
+
+    const btn = document.getElementById('join-btn');
+    btn.disabled = true;
+    btn.textContent = 'Joining…';
+
+    try {
+      const res = await fetch(`${API}/api/sessions/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin, name })
+      });
+      const data = await res.json();
+      if (!res.ok) { err.style.display = 'block'; return; }
+
+      const initials = name.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2);
       document.getElementById('acc-avatar').textContent = initials || '?';
       document.getElementById('acc-name').textContent = 'Welcome, ' + name;
+      document.getElementById('acc-session').textContent = data.sessionName;
+
+      // Build trainer list from server response
+      const at = document.getElementById('acc-trainers');
+      at.innerHTML = '';
+      (data.trainers || []).forEach(t => {
+        const url = TRAINER_URLS[t] || '#';
+        const a = document.createElement('a');
+        a.className = 'trainer-chip';
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>${t}`;
+        at.appendChild(a);
+      });
+
       markDone('join');
       nav('access');
-    } else {
+    } catch {
       err.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Join session';
     }
   }
 
@@ -638,7 +696,7 @@
     const params = new URLSearchParams(window.location.search);
     const pin = params.get('pin');
     if (pin && pin.length === 4) {
-      ['d1','d2','d3','d4'].forEach((id, i) => {
+      ['d1', 'd2', 'd3', 'd4'].forEach((id, i) => {
         document.getElementById(id).value = pin[i] || '';
       });
       nav('join');
