@@ -1,0 +1,11 @@
+{
+  "name": "trainers-whitebridgemarine",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "cd backend && node server.js",
+    "postinstall": "cd backend && npm install"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
