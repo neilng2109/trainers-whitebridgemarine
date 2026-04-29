@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WBM Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F5F4F0;
+    --surface: #FFFFFF;
+    --surface2: #EEEDE9;
+    --border: rgba(0,0,0,0.08);
+    --border-strong: rgba(0,0,0,0.15);
+    --text: #1A1A18;
+    --text-muted: #6B6B67;
+    --text-faint: #9E9E9A;
+    --accent: #1B3D6E;
+    --accent-light: #E8EDF5;
+    --green: #1D6A4A;
+    --green-light: #E3F2EB;
+    --red: #8B2020;
+    --red-light: #FDEAEA;
+    --amber: #7A4F00;
+    --amber-light: #FDF3DC;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --mono: 'DM Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; font-size: 15px; line-height: 1.5; }
+
+  .app { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+
+  .wordmark {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 32px; padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .wordmark-left { display: flex; align-items: center; gap: 10px; }
+  .wordmark-logo { height: 64px; display: flex; align-items: center; }
+  .wordmark-logo img { height: 64px; width: auto; display: block; }
+  .wordmark-text { font-size: 14px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.01em; }
+  .wordmark-sub { font-size: 11px; color: var(--text-faint); margin-top: 1px; }
+
+  .screen { display: none; animation: fadeIn 0.2s ease; }
+  .screen.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .card-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+
+  label { font-size: 12px; font-weight: 500; color: var(--text-muted); display: block; margin-bottom: 6px; letter-spacing: 0.02em; text-transform: uppercase; }
+
+  input[type=text], input[type=email], input[type=password] {
+    width: 100%; padding: 10px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-family: var(--sans); font-size: 15px;
+    background: var(--surface); color: var(--text);
+    outline: none; transition: border-color 0.15s;
+    margin-bottom: 16px;
+  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+
+  .btn {
+    display: block; width: 100%; padding: 12px 20px;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius-sm);
+    font-family: var(--sans); font-size: 15px; font-weight: 500;
+    cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+    text-align: center;
+  }
+  .btn:hover { opacity: 0.9; }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--border-strong); }
+  .btn-ghost:hover { background: var(--accent-light); }
+  .btn-danger { background: var(--red); }
+  .btn-sm { padding: 7px 14px; font-size: 13px; width: auto; display: inline-block; }
+
+  .err { font-size: 13px; color: var(--red); margin-top: 8px; display: none; }
+
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title { font-size: 16px; font-weight: 600; }
+
+  /* Instructor table */
+  .instructor-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .instructor-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .instructor-info { display: flex; align-items: center; gap: 12px; }
+  .instructor-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--accent-light); color: var(--accent);
+    font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .instructor-name { font-size: 14px; font-weight: 500; }
+  .instructor-email { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+  .instructor-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 500; padding: 3px 9px;
+    border-radius: 20px; letter-spacing: 0.02em;
+  }
+  .pill-green { background: var(--green-light); color: var(--green); }
+  .pill-amber { background: var(--amber-light); color: var(--amber); }
+
+  /* Modal */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4); z-index: 100;
+    align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius);
+    border-top: 3px solid var(--accent);
+    padding: 24px; width: 100%; max-width: 420px;
+    animation: fadeIn 0.15s ease;
+  }
+  .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .modal-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+  .modal-footer { display: flex; gap: 8px; margin-top: 8px; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  .logout-btn {
+    font-size: 13px; color: var(--text-muted); background: none; border: none;
+    cursor: pointer; font-family: var(--sans); padding: 4px 8px;
+    border-radius: var(--radius-sm); transition: background 0.15s;
+  }
+  .logout-btn:hover { background: var(--surface2); color: var(--text); }
+
+  .empty-state {
+    text-align: center; padding: 32px 0;
+    font-size: 13px; color: var(--text-faint);
+  }
+
+  .temp-pass-box {
+    background: var(--surface2); border-radius: var(--radius-sm);
+    padding: 12px 14px; font-family: var(--mono); font-size: 14px;
+    letter-spacing: 0.05em; text-align: center; margin: 12px 0;
+    border: 1px dashed var(--border-strong);
+  }
+
+  .success-card {
+    background: var(--green-light); border: 1px solid var(--green);
+    border-radius: var(--radius-sm); padding: 16px; margin-bottom: 16px;
+    font-size: 13px; color: var(--green); display: none;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="wordmark">
+    <div class="wordmark-left">
+      <div class="wordmark-logo">
+        <img src="logo-dark1.png" alt="Whitebridge Marine">
+      </div>
+      <div>
+        <div class="wordmark-text">Whitebridge Marine</div>
+        <div class="wordmark-sub">Admin Panel</div>
+      </div>
+    </div>
+    <button class="logout-btn" id="logout-btn" style="display:none;" onclick="logout()">Sign out</button>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="screen-login" class="screen active">
+    <div class="card">
+      <div class="card-title">Admin sign in</div>
+      <div class="card-sub">Restricted access — authorised personnel only</div>
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="admin@whitebridgemarine.com" autocomplete="email">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn" id="login-btn" onclick="doLogin()">Sign in</button>
+      <p class="err" id="login-err">Incorrect credentials. Try again.</p>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="screen-dashboard" class="screen">
+
+    <div class="card">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Instructors</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">Manage instructor accounts</div>
+        </div>
+        <button class="btn btn-sm" onclick="openAddModal()">+ Add instructor</button>
+      </div>
+
+      <div class="success-card" id="success-msg"></div>
+
+      <div class="instructor-list" id="instructor-list">
+        <div class="empty-state">No instructors yet — add one to get started.</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Add Instructor Modal -->
+<div class="modal-backdrop" id="add-modal">
+  <div class="modal">
+    <div class="modal-title">Add instructor</div>
+    <div class="modal-sub">They can log in immediately with the temporary password.</div>
+    <label>Full name</label>
+    <input type="text" id="new-name" placeholder="e.g. James Kowalski">
+    <label>Email</label>
+    <input type="email" id="new-email" placeholder="j.kowalski@whitebridgemarine.com">
+    <label>Temporary password</label>
+    <input type="password" id="new-pass" placeholder="Min. 8 characters">
+    <p class="err" id="add-err"></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" style="flex:1;" onclick="closeAddModal()">Cancel</button>
+      <button class="btn" style="flex:2;" id="add-btn" onclick="addInstructor()">Add instructor</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-backdrop" id="reset-modal">
+  <div class="modal">
+    <div class="modal-title">Reset password</div>
+    <div class="modal-sub" id="reset-sub">Set a new temporary password for this instructor.</div>
+    <label>New temporary password</label>
+    <input type="password" id="reset-pass" placeholder="Min. 8 characters">
+    <p class="err" id="reset-err"></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" style="flex:1;" onclick="closeResetModal()">Cancel</button>
+      <button class="btn" style="flex:2;" id="reset-btn" onclick="confirmReset()">Reset password</button>
+    </div>
+  </div>
+</div>
+
+<!-- Remove Confirm Modal -->
+<div class="modal-backdrop" id="remove-modal">
+  <div class="modal">
+    <div class="modal-title">Remove instructor</div>
+    <div class="modal-sub" id="remove-sub">This will immediately revoke their access. Are you sure?</div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" style="flex:1;" onclick="closeRemoveModal()">Cancel</button>
+      <button class="btn btn-danger" style="flex:2;" id="remove-btn" onclick="confirmRemove()">Remove</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'https://trainers-backend-fffe8a616e00.herokuapp.com';
+
+  let adminToken = localStorage.getItem('wbm_admin_token') || '';
+  let selectedInstructorId = '';
+
+  function nav(screen) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + screen).classList.add('active');
+  }
+
+  async function doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const pass = document.getElementById('login-pass').value;
+    const err = document.getElementById('login-err');
+    const btn = document.getElementById('login-btn');
+    err.style.display = 'none';
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    try {
+      const res = await fetch(`${API}/api/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      adminToken = data.token;
+      localStorage.setItem('wbm_admin_token', adminToken);
+      document.getElementById('logout-btn').style.display = 'block';
+      nav('dashboard');
+      loadInstructors();
+    } catch {
+      err.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Sign in';
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('wbm_admin_token');
+    adminToken = '';
+    document.getElementById('logout-btn').style.display = 'none';
+    nav('login');
+  }
+
+  async function loadInstructors() {
+    try {
+      const res = await fetch(`${API}/api/admin/instructors`, {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      const data = await res.json();
+      renderInstructors(data);
+    } catch {
+      renderInstructors([]);
+    }
+  }
+
+  function renderInstructors(list) {
+    const el = document.getElementById('instructor-list');
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state">No instructors yet — add one to get started.</div>';
+      return;
+    }
+    el.innerHTML = list.map(i => `
+      <div class="instructor-row">
+        <div class="instructor-info">
+          <div class="instructor-avatar">${initials(i.name)}</div>
+          <div>
+            <div class="instructor-name">${i.name}</div>
+            <div class="instructor-email">${i.email}</div>
+          </div>
+        </div>
+        <div class="instructor-actions">
+          <button class="btn btn-ghost btn-sm" onclick="openResetModal('${i.id}', '${i.name}')">Reset password</button>
+          <button class="btn btn-danger btn-sm" onclick="openRemoveModal('${i.id}', '${i.name}')">Remove</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function initials(name) {
+    return name.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2);
+  }
+
+  function showSuccess(msg) {
+    const el = document.getElementById('success-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 4000);
+  }
+
+  // Add instructor
+  function openAddModal() {
+    document.getElementById('new-name').value = '';
+    document.getElementById('new-email').value = '';
+    document.getElementById('new-pass').value = '';
+    document.getElementById('add-err').style.display = 'none';
+    document.getElementById('add-modal').classList.add('open');
+    setTimeout(() => document.getElementById('new-name').focus(), 100);
+  }
+  function closeAddModal() { document.getElementById('add-modal').classList.remove('open'); }
+
+  async function addInstructor() {
+    const name = document.getElementById('new-name').value.trim();
+    const email = document.getElementById('new-email').value.trim();
+    const pass = document.getElementById('new-pass').value;
+    const err = document.getElementById('add-err');
+    const btn = document.getElementById('add-btn');
+    err.style.display = 'none';
+
+    if (!name || !email || pass.length < 8) {
+      err.textContent = !name ? 'Name is required.' : !email ? 'Email is required.' : 'Password must be at least 8 characters.';
+      err.style.display = 'block'; return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Adding…';
+    try {
+      const res = await fetch(`${API}/api/admin/instructors`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+        body: JSON.stringify({ name, email, password: pass })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      closeAddModal();
+      showSuccess(`${name} has been added as an instructor.`);
+      loadInstructors();
+    } catch (e) {
+      err.textContent = e.message || 'Failed to add instructor.';
+      err.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Add instructor';
+    }
+  }
+
+  // Reset password
+  function openResetModal(id, name) {
+    selectedInstructorId = id;
+    document.getElementById('reset-sub').textContent = `Set a new temporary password for ${name}.`;
+    document.getElementById('reset-pass').value = '';
+    document.getElementById('reset-err').style.display = 'none';
+    document.getElementById('reset-modal').classList.add('open');
+    setTimeout(() => document.getElementById('reset-pass').focus(), 100);
+  }
+  function closeResetModal() { document.getElementById('reset-modal').classList.remove('open'); }
+
+  async function confirmReset() {
+    const pass = document.getElementById('reset-pass').value;
+    const err = document.getElementById('reset-err');
+    const btn = document.getElementById('reset-btn');
+    err.style.display = 'none';
+
+    if (pass.length < 8) {
+      err.textContent = 'Password must be at least 8 characters.';
+      err.style.display = 'block'; return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Resetting…';
+    try {
+      const res = await fetch(`${API}/api/admin/instructors/${selectedInstructorId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+        body: JSON.stringify({ password: pass })
+      });
+      if (!res.ok) throw new Error();
+      closeResetModal();
+      showSuccess('Password has been reset successfully.');
+    } catch {
+      err.textContent = 'Failed to reset password.';
+      err.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Reset password';
+    }
+  }
+
+  // Remove instructor
+  function openRemoveModal(id, name) {
+    selectedInstructorId = id;
+    document.getElementById('remove-sub').textContent = `This will immediately revoke access for ${name}. Are you sure?`;
+    document.getElementById('remove-modal').classList.add('open');
+  }
+  function closeRemoveModal() { document.getElementById('remove-modal').classList.remove('open'); }
+
+  async function confirmRemove() {
+    const btn = document.getElementById('remove-btn');
+    btn.disabled = true; btn.textContent = 'Removing…';
+    try {
+      const res = await fetch(`${API}/api/admin/instructors/${selectedInstructorId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      if (!res.ok) throw new Error();
+      closeRemoveModal();
+      showSuccess('Instructor removed.');
+      loadInstructors();
+    } catch {
+      closeRemoveModal();
+    } finally {
+      btn.disabled = false; btn.textContent = 'Remove';
+    }
+  }
+
+  // Close modals on backdrop click
+  document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+    backdrop.addEventListener('click', e => { if (e.target === backdrop) backdrop.classList.remove('open'); });
+  });
+
+  // Auto-login if token exists
+  window.addEventListener('DOMContentLoaded', () => {
+    if (adminToken) {
+      document.getElementById('logout-btn').style.display = 'block';
+      nav('dashboard');
+      loadInstructors();
+    }
+  });
+</script>
+</body>
+</html>
