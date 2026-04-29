@@ -102,6 +102,19 @@ app.post('/api/admin/instructors', requireAdmin, async (req, res) => {
   res.status(201).json({ id, name, email });
 });
 
+// PUT /api/admin/instructors/:id
+app.put('/api/admin/instructors/:id', requireAdmin, (req, res) => {
+  const { name, email } = req.body || {};
+  if (!name || !email) return res.status(400).json({ error: 'Name and email are required' });
+  const instructor = instructors.get(req.params.id);
+  if (!instructor) return res.status(404).json({ error: 'Instructor not found' });
+  const duplicate = [...instructors.values()].find(i => i.email === email && i.id !== req.params.id);
+  if (duplicate) return res.status(409).json({ error: 'That email is already in use' });
+  instructor.name = name;
+  instructor.email = email;
+  res.json({ id: instructor.id, name, email });
+});
+
 // DELETE /api/admin/instructors/:id
 app.delete('/api/admin/instructors/:id', requireAdmin, (req, res) => {
   if (!instructors.has(req.params.id)) return res.status(404).json({ error: 'Instructor not found' });

@@ -75,6 +75,15 @@
   }
   input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
 
+  .pass-wrap { position: relative; }
+  .pass-wrap input { padding-right: 44px; }
+  .pass-toggle {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-60%);
+    background: none; border: none; cursor: pointer; padding: 4px;
+    color: var(--text-faint); transition: color 0.15s;
+  }
+  .pass-toggle:hover { color: var(--text-muted); }
+
   .btn {
     display: block; width: 100%; padding: 12px 20px;
     background: var(--accent); color: #fff;
@@ -197,7 +206,12 @@
       <label>Email</label>
       <input type="email" id="login-email" placeholder="admin@whitebridgemarine.com" autocomplete="email">
       <label>Password</label>
-      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      <div class="pass-wrap">
+        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" class="pass-toggle" onclick="togglePass('login-pass', this)" tabindex="-1">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
       <button class="btn" id="login-btn" onclick="doLogin()">Sign in</button>
       <p class="err" id="login-err">Incorrect credentials. Try again.</p>
     </div>
@@ -236,11 +250,33 @@
     <label>Email</label>
     <input type="email" id="new-email" placeholder="j.kowalski@whitebridgemarine.com">
     <label>Temporary password</label>
-    <input type="password" id="new-pass" placeholder="Min. 8 characters">
+    <div class="pass-wrap">
+      <input type="password" id="new-pass" placeholder="Min. 8 characters">
+      <button type="button" class="pass-toggle" onclick="togglePass('new-pass', this)" tabindex="-1">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
     <p class="err" id="add-err"></p>
     <div class="modal-footer">
       <button class="btn btn-ghost" style="flex:1;" onclick="closeAddModal()">Cancel</button>
       <button class="btn" style="flex:2;" id="add-btn" onclick="addInstructor()">Add instructor</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Instructor Modal -->
+<div class="modal-backdrop" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title">Edit instructor</div>
+    <div class="modal-sub">Update name or email address.</div>
+    <label>Full name</label>
+    <input type="text" id="edit-name" placeholder="Full name">
+    <label>Email</label>
+    <input type="email" id="edit-email" placeholder="email@whitebridgemarine.com">
+    <p class="err" id="edit-err"></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" style="flex:1;" onclick="closeEditModal()">Cancel</button>
+      <button class="btn" style="flex:2;" id="edit-btn" onclick="confirmEdit()">Save changes</button>
     </div>
   </div>
 </div>
@@ -251,7 +287,12 @@
     <div class="modal-title">Reset password</div>
     <div class="modal-sub" id="reset-sub">Set a new temporary password for this instructor.</div>
     <label>New temporary password</label>
-    <input type="password" id="reset-pass" placeholder="Min. 8 characters">
+    <div class="pass-wrap">
+      <input type="password" id="reset-pass" placeholder="Min. 8 characters">
+      <button type="button" class="pass-toggle" onclick="togglePass('reset-pass', this)" tabindex="-1">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
     <p class="err" id="reset-err"></p>
     <div class="modal-footer">
       <button class="btn btn-ghost" style="flex:1;" onclick="closeResetModal()">Cancel</button>
@@ -345,6 +386,7 @@
           </div>
         </div>
         <div class="instructor-actions">
+          <button class="btn btn-ghost btn-sm" onclick="openEditModal('${i.id}', '${i.name}', '${i.email}')">Edit</button>
           <button class="btn btn-ghost btn-sm" onclick="openResetModal('${i.id}', '${i.name}')">Reset password</button>
           <button class="btn btn-danger btn-sm" onclick="openRemoveModal('${i.id}', '${i.name}')">Remove</button>
         </div>
@@ -404,6 +446,57 @@
       err.style.display = 'block';
     } finally {
       btn.disabled = false; btn.textContent = 'Add instructor';
+    }
+  }
+
+  // Password show/hide toggle
+  function togglePass(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.style.color = showing ? 'var(--text-faint)' : 'var(--accent)';
+  }
+
+  // Edit instructor
+  function openEditModal(id, name, email) {
+    selectedInstructorId = id;
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-email').value = email;
+    document.getElementById('edit-err').style.display = 'none';
+    document.getElementById('edit-modal').classList.add('open');
+    setTimeout(() => document.getElementById('edit-name').focus(), 100);
+  }
+  function closeEditModal() { document.getElementById('edit-modal').classList.remove('open'); }
+
+  async function confirmEdit() {
+    const name = document.getElementById('edit-name').value.trim();
+    const email = document.getElementById('edit-email').value.trim();
+    const err = document.getElementById('edit-err');
+    const btn = document.getElementById('edit-btn');
+    err.style.display = 'none';
+
+    if (!name || !email) {
+      err.textContent = !name ? 'Name is required.' : 'Email is required.';
+      err.style.display = 'block'; return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const res = await fetch(`${API}/api/admin/instructors/${selectedInstructorId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+        body: JSON.stringify({ name, email })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      closeEditModal();
+      showSuccess('Instructor details updated.');
+      loadInstructors();
+    } catch (e) {
+      err.textContent = e.message || 'Failed to update instructor.';
+      err.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save changes';
     }
   }
 
