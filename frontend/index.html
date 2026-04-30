@@ -224,6 +224,25 @@
   .session-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
   .session-title { font-size: 16px; font-weight: 600; }
   .session-expiry { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4); z-index: 100;
+    align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal-card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; width: 100%; max-width: 400px;
+    border-top: 3px solid var(--accent);
+  }
+  .pw-wrap { position: relative; margin-bottom: 16px; }
+  .pw-wrap input { margin-bottom: 0; padding-right: 42px; }
+  .pw-toggle {
+    position: absolute; right: 10px; top: 10px;
+    background: none; border: none; cursor: pointer;
+    padding: 4px; color: var(--text-muted);
+  }
 </style>
 </head>
 <body>
@@ -314,6 +333,7 @@
       <button class="btn" id="create-btn" onclick="createSession()">Generate PIN &amp; QR code →</button>
       <p class="err" id="create-err"></p>
     </div>
+    <p style="text-align:center;margin-top:8px;"><a onclick="openChangePassword()" style="font-size:13px;color:var(--text-muted);cursor:pointer;">Change password</a></p>
   </div>
 
   <!-- 3. DASHBOARD -->
@@ -408,6 +428,35 @@
     </div>
   </div>
 
+</div>
+
+<!-- Change password modal -->
+<div class="modal-overlay" id="modal-pw" onclick="if(event.target===this)closeChangePassword()">
+  <div class="modal-card">
+    <div class="card-title" style="margin-bottom:4px;">Change password</div>
+    <div class="card-sub">Enter your current password and choose a new one</div>
+    <label>Current password</label>
+    <div class="pw-wrap">
+      <input type="password" id="cp-current" placeholder="••••••••" autocomplete="current-password">
+      <button class="pw-toggle" type="button" onclick="togglePw('cp-current',this)" tabindex="-1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>
+    </div>
+    <label>New password</label>
+    <div class="pw-wrap">
+      <input type="password" id="cp-new" placeholder="Min. 8 characters" autocomplete="new-password">
+      <button class="pw-toggle" type="button" onclick="togglePw('cp-new',this)" tabindex="-1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>
+    </div>
+    <label>Confirm new password</label>
+    <div class="pw-wrap">
+      <input type="password" id="cp-confirm" placeholder="Repeat new password" autocomplete="new-password" onkeydown="if(event.key==='Enter')doChangePassword()">
+      <button class="pw-toggle" type="button" onclick="togglePw('cp-confirm',this)" tabindex="-1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>
+    </div>
+    <p class="err" id="cp-err"></p>
+    <p style="font-size:13px;color:var(--green);display:none;margin-top:8px;" id="cp-ok">Password changed successfully.</p>
+    <div class="btn-row" style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" onclick="closeChangePassword()">Cancel</button>
+      <button class="btn btn-sm" id="cp-btn" onclick="doChangePassword()">Update password</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -685,6 +734,58 @@
     } finally {
       btn.disabled = false;
       btn.textContent = 'Join session';
+    }
+  }
+
+  function openChangePassword() {
+    ['cp-current','cp-new','cp-confirm'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('cp-err').style.display = 'none';
+    document.getElementById('cp-ok').style.display = 'none';
+    document.getElementById('modal-pw').classList.add('active');
+    setTimeout(() => document.getElementById('cp-current').focus(), 50);
+  }
+
+  function closeChangePassword() {
+    document.getElementById('modal-pw').classList.remove('active');
+  }
+
+  function togglePw(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.innerHTML = show
+      ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2l12 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M6.5 6.6A2 2 0 0 0 9.4 9.5M4 4.2C2.5 5.2 1.5 6.8 1.5 8c0 0 2.5 5 6.5 5 1.2 0 2.3-.3 3.2-.8M7 3c.3-.1.7-.1 1-.1 4 0 6.5 5 6.5 5s-.5 1-1.5 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg>';
+  }
+
+  async function doChangePassword() {
+    const currentPassword = document.getElementById('cp-current').value;
+    const newPassword = document.getElementById('cp-new').value;
+    const confirm = document.getElementById('cp-confirm').value;
+    const errEl = document.getElementById('cp-err');
+    const okEl = document.getElementById('cp-ok');
+    errEl.style.display = 'none';
+    okEl.style.display = 'none';
+    if (!currentPassword) { errEl.textContent = 'Enter your current password.'; errEl.style.display = 'block'; return; }
+    if (newPassword.length < 8) { errEl.textContent = 'New password must be at least 8 characters.'; errEl.style.display = 'block'; return; }
+    if (newPassword !== confirm) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return; }
+    const btn = document.getElementById('cp-btn');
+    btn.disabled = true; btn.textContent = 'Updating…';
+    try {
+      const res = await fetch(`${API}/api/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update password');
+      okEl.style.display = 'block';
+      setTimeout(() => closeChangePassword(), 1500);
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Update password';
     }
   }
 

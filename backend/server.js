@@ -87,6 +87,19 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token, name: instructor.name });
 });
 
+app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  const { rows } = await pool.query('SELECT * FROM instructors WHERE id = $1', [req.user.id]);
+  const instructor = rows[0];
+  if (!instructor) return res.status(404).json({ error: 'Instructor not found' });
+  const match = await bcrypt.compare(currentPassword, instructor.password_hash);
+  if (!match) return res.status(401).json({ error: 'Current password is incorrect' });
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await pool.query('UPDATE instructors SET password_hash = $1 WHERE id = $2', [passwordHash, req.user.id]);
+  res.json({ ok: true });
+});
+
 app.post('/api/admin/login', (req, res) => {
   const { email, password } = req.body || {};
   if (email !== ADMIN_EMAIL || password !== ADMIN_PASS) {
