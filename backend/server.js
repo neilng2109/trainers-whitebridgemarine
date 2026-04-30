@@ -196,7 +196,23 @@ app.post('/api/sessions/join', (req, res) => {
   const participant = { name: name || 'Participant', joinedAt: Date.now() };
   session.participants.push(participant);
   io.to(sessionId).emit('participant:joined', { count: session.participants.length, participant });
-  res.json({ sessionId, sessionName: session.name, trainers: session.trainers });
+  const participantToken = jwt.sign({ sessionId, trainers: session.trainers }, JWT_SECRET, { expiresIn: '24h' });
+  res.json({ sessionId, sessionName: session.name, trainers: session.trainers, participantToken });
+});
+
+app.post('/api/sessions/verify-access', (req, res) => {
+  const { token, trainer } = req.body || {};
+  if (!token) return res.status(401).json({ error: 'No token' });
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.role === 'instructor' || payload.role === 'admin') return res.json({ ok: true });
+    const session = sessions.get(payload.sessionId);
+    if (!session) return res.status(403).json({ error: 'Session ended' });
+    if (!payload.trainers.includes(trainer)) return res.status(403).json({ error: 'Trainer not authorized' });
+    res.json({ ok: true });
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
 });
 
 app.delete('/api/sessions/:id', requireAuth, (req, res) => {

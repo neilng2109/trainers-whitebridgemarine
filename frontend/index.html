@@ -708,6 +708,8 @@
       const data = await res.json();
       if (!res.ok) { err.style.display = 'block'; return; }
 
+      if (data.participantToken) localStorage.setItem('wbm_participant_token', data.participantToken);
+
       const initials = name.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2);
       document.getElementById('acc-avatar').textContent = initials || '?';
       document.getElementById('acc-name').textContent = 'Welcome, ' + name;
