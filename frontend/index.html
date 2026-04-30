@@ -858,6 +858,23 @@
         localStorage.removeItem('wbm_participant_exp');
       }
     }
+
+    // Restore instructor session
+    const instructorToken = localStorage.getItem('wbm_token');
+    if (instructorToken) {
+      try {
+        const b64 = instructorToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const pad = b64 + '='.repeat((4 - b64.length % 4) % 4);
+        const payload = JSON.parse(atob(pad));
+        if (payload.exp * 1000 > Date.now() && (payload.role === 'instructor' || payload.role === 'admin')) {
+          document.getElementById('step-nav').style.display = 'flex';
+          markDone('login');
+          nav('create');
+          return;
+        }
+      } catch { /* ignore */ }
+      localStorage.removeItem('wbm_token');
+    }
   });
 </script>
 </body>
