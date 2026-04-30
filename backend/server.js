@@ -6,6 +6,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
+const { Pool } = require('pg');
 
 const app = express();
 const server = http.createServer(app);
@@ -23,10 +24,25 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@whitebridgemarine.com';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin-change-me';
 
-// In-memory stores
-const instructors = new Map(); // id -> { id, name, email, passwordHash }
-const sessions = new Map();    // sessionId -> session
-const pinIndex = new Map();    // pin -> sessionId
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
+
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS instructors (
+      id UUID PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL
+    )
+  `);
+}
+
+// Sessions remain in-memory (transient)
+const sessions = new Map();
+const pinIndex = new Map();
 
 function genPIN() {
   let pin;
@@ -60,18 +76,17 @@ function requireAdmin(req, res, next) {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-// POST /api/auth/login — instructor login
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
-  const instructor = [...instructors.values()].find(i => i.email === email);
+  const { rows } = await pool.query('SELECT * FROM instructors WHERE email = $1', [email]);
+  const instructor = rows[0];
   if (!instructor) return res.status(401).json({ error: 'Invalid credentials' });
-  const match = await bcrypt.compare(password, instructor.passwordHash);
+  const match = await bcrypt.compare(password, instructor.password_hash);
   if (!match) return res.status(401).json({ error: 'Invalid credentials' });
   const token = jwt.sign({ id: instructor.id, email: instructor.email, role: 'instructor' }, JWT_SECRET, { expiresIn: '12h' });
   res.json({ token, name: instructor.name });
 });
 
-// POST /api/admin/login — admin login
 app.post('/api/admin/login', (req, res) => {
   const { email, password } = req.body || {};
   if (email !== ADMIN_EMAIL || password !== ADMIN_PASS) {
@@ -83,58 +98,65 @@ app.post('/api/admin/login', (req, res) => {
 
 // ── Admin — Instructor management ─────────────────────────────────────────────
 
-// GET /api/admin/instructors
-app.get('/api/admin/instructors', requireAdmin, (req, res) => {
-  const list = [...instructors.values()].map(({ id, name, email }) => ({ id, name, email }));
-  res.json(list);
+app.get('/api/admin/instructors', requireAdmin, async (req, res) => {
+  const { rows } = await pool.query('SELECT id, name, email FROM instructors ORDER BY name');
+  res.json(rows);
 });
 
-// POST /api/admin/instructors
 app.post('/api/admin/instructors', requireAdmin, async (req, res) => {
   const { name, email, password } = req.body || {};
   if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password are required' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  const exists = [...instructors.values()].find(i => i.email === email);
-  if (exists) return res.status(409).json({ error: 'An instructor with that email already exists' });
   const id = uuidv4();
   const passwordHash = await bcrypt.hash(password, 10);
-  instructors.set(id, { id, name, email, passwordHash });
-  res.status(201).json({ id, name, email });
+  try {
+    await pool.query(
+      'INSERT INTO instructors (id, name, email, password_hash) VALUES ($1, $2, $3, $4)',
+      [id, name, email, passwordHash]
+    );
+    res.status(201).json({ id, name, email });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'An instructor with that email already exists' });
+    throw err;
+  }
 });
 
-// PUT /api/admin/instructors/:id
-app.put('/api/admin/instructors/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/instructors/:id', requireAdmin, async (req, res) => {
   const { name, email } = req.body || {};
   if (!name || !email) return res.status(400).json({ error: 'Name and email are required' });
-  const instructor = instructors.get(req.params.id);
-  if (!instructor) return res.status(404).json({ error: 'Instructor not found' });
-  const duplicate = [...instructors.values()].find(i => i.email === email && i.id !== req.params.id);
-  if (duplicate) return res.status(409).json({ error: 'That email is already in use' });
-  instructor.name = name;
-  instructor.email = email;
-  res.json({ id: instructor.id, name, email });
+  try {
+    const { rowCount } = await pool.query(
+      'UPDATE instructors SET name = $1, email = $2 WHERE id = $3',
+      [name, email, req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Instructor not found' });
+    res.json({ id: req.params.id, name, email });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'That email is already in use' });
+    throw err;
+  }
 });
 
-// DELETE /api/admin/instructors/:id
-app.delete('/api/admin/instructors/:id', requireAdmin, (req, res) => {
-  if (!instructors.has(req.params.id)) return res.status(404).json({ error: 'Instructor not found' });
-  instructors.delete(req.params.id);
+app.delete('/api/admin/instructors/:id', requireAdmin, async (req, res) => {
+  const { rowCount } = await pool.query('DELETE FROM instructors WHERE id = $1', [req.params.id]);
+  if (rowCount === 0) return res.status(404).json({ error: 'Instructor not found' });
   res.json({ ok: true });
 });
 
-// POST /api/admin/instructors/:id/reset-password
 app.post('/api/admin/instructors/:id/reset-password', requireAdmin, async (req, res) => {
   const { password } = req.body || {};
   if (!password || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  const instructor = instructors.get(req.params.id);
-  if (!instructor) return res.status(404).json({ error: 'Instructor not found' });
-  instructor.passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 10);
+  const { rowCount } = await pool.query(
+    'UPDATE instructors SET password_hash = $1 WHERE id = $2',
+    [passwordHash, req.params.id]
+  );
+  if (rowCount === 0) return res.status(404).json({ error: 'Instructor not found' });
   res.json({ ok: true });
 });
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
-// POST /api/sessions
 app.post('/api/sessions', requireAuth, (req, res) => {
   const { name, duration, trainers, expected } = req.body || {};
   if (!Array.isArray(trainers) || trainers.length === 0) {
@@ -147,14 +169,12 @@ app.post('/api/sessions', requireAuth, (req, res) => {
   res.json({ id, pin });
 });
 
-// GET /api/sessions/:id
 app.get('/api/sessions/:id', requireAuth, (req, res) => {
   const session = sessions.get(req.params.id);
   if (!session) return res.status(404).json({ error: 'Session not found' });
   res.json(session);
 });
 
-// POST /api/sessions/join
 app.post('/api/sessions/join', (req, res) => {
   const { pin, name } = req.body || {};
   const sessionId = pinIndex.get(pin);
@@ -166,7 +186,6 @@ app.post('/api/sessions/join', (req, res) => {
   res.json({ sessionId, sessionName: session.name, trainers: session.trainers });
 });
 
-// DELETE /api/sessions/:id
 app.delete('/api/sessions/:id', requireAuth, (req, res) => {
   const session = sessions.get(req.params.id);
   if (!session) return res.status(404).json({ error: 'Session not found' });
@@ -183,4 +202,6 @@ io.on('connection', socket => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`WBM backend running on port ${PORT}`));
+initDB()
+  .then(() => server.listen(PORT, () => console.log(`WBM backend running on port ${PORT}`)))
+  .catch(err => { console.error('DB init failed:', err); process.exit(1); });
