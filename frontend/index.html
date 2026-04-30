@@ -808,10 +808,24 @@
     }
 
     const participantToken = localStorage.getItem('wbm_participant_token');
-    const participantExp = parseInt(localStorage.getItem('wbm_participant_exp') || '0');
-    if (participantToken && participantExp > Date.now()) {
-      const trainers = JSON.parse(localStorage.getItem('wbm_participant_trainers') || '[]');
-      if (trainers.length > 0) {
+    if (participantToken) {
+      // Get trainers from plain storage (new sessions) or decode JWT (old sessions).
+      let trainers = JSON.parse(localStorage.getItem('wbm_participant_trainers') || 'null');
+      let expired = false;
+      if (!trainers) {
+        try {
+          const b64 = participantToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+          const pad = b64 + '='.repeat((4 - b64.length % 4) % 4);
+          const payload = JSON.parse(atob(pad));
+          if (payload.exp * 1000 < Date.now()) { expired = true; }
+          else { trainers = payload.trainers || []; }
+        } catch { expired = true; }
+      } else {
+        const exp = parseInt(localStorage.getItem('wbm_participant_exp') || '0');
+        if (exp && exp < Date.now()) expired = true;
+      }
+
+      if (!expired && trainers && trainers.length > 0) {
         const name = localStorage.getItem('wbm_participant_name') || 'Participant';
         const sessionName = localStorage.getItem('wbm_session_name') || '';
         const initials = name.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2);
@@ -834,6 +848,14 @@
 
         nav('access');
         return;
+      }
+
+      if (expired) {
+        localStorage.removeItem('wbm_participant_token');
+        localStorage.removeItem('wbm_participant_name');
+        localStorage.removeItem('wbm_session_name');
+        localStorage.removeItem('wbm_participant_trainers');
+        localStorage.removeItem('wbm_participant_exp');
       }
     }
   });
