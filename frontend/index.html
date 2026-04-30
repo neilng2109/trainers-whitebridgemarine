@@ -517,6 +517,7 @@
       if (!res.ok) throw new Error(data.error || 'Login failed');
       token = data.token;
       localStorage.setItem('wbm_token', token);
+      localStorage.setItem('wbm_instructor_name', data.name || '');
       document.getElementById('step-nav').style.display = 'flex';
       markDone('login');
       nav('create');
@@ -573,6 +574,8 @@
       sessionId = data.id;
       pCount = 0;
       timerSecs = 0;
+      localStorage.setItem('wbm_session_trainers_instructor', JSON.stringify(trainers));
+      localStorage.setItem('wbm_session_name_instructor', name);
 
       // Dashboard
       document.getElementById('dash-name').textContent = name;
@@ -671,6 +674,8 @@
     pCount = 0;
     if (timerInt) { clearInterval(timerInt); timerInt = null; }
     if (socket) { socket.disconnect(); socket = null; }
+    localStorage.removeItem('wbm_session_trainers_instructor');
+    localStorage.removeItem('wbm_session_name_instructor');
 
     markDone('dashboard');
     nav('create');
@@ -869,7 +874,30 @@
         if (payload.exp * 1000 > Date.now() && (payload.role === 'instructor' || payload.role === 'admin')) {
           document.getElementById('step-nav').style.display = 'flex';
           markDone('login');
-          nav('create');
+          const sessionTrainers = JSON.parse(localStorage.getItem('wbm_session_trainers_instructor') || 'null');
+          const sessionName = localStorage.getItem('wbm_session_name_instructor') || '';
+          if (sessionTrainers && sessionTrainers.length > 0) {
+            const instrName = localStorage.getItem('wbm_instructor_name') || 'Instructor';
+            const initials = instrName.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2);
+            document.getElementById('acc-avatar').textContent = initials || 'I';
+            document.getElementById('acc-name').textContent = instrName;
+            document.getElementById('acc-session').textContent = sessionName;
+            const at = document.getElementById('acc-trainers');
+            at.innerHTML = '';
+            sessionTrainers.forEach(t => {
+              const url = TRAINER_URLS[t] || '#';
+              const a = document.createElement('a');
+              a.className = 'trainer-chip';
+              a.href = url;
+              a.target = '_blank';
+              a.rel = 'noopener';
+              a.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>${t}`;
+              at.appendChild(a);
+            });
+            nav('access');
+          } else {
+            nav('create');
+          }
           return;
         }
       } catch { /* ignore */ }
